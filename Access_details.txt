@@ -1,0 +1,2 @@
+Bootstrap server: 192.168.0.213:9092
+Topic name: indicators-stream
