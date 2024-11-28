@@ -1,0 +1,2 @@
+Install logstash from https://www.elastic.co/downloads/logstash
+logstash_bin_path = "C:/logstash-8.16.1/bin/logstash.bat" - edit path
