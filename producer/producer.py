@@ -4,6 +4,8 @@ import time
 import subprocess
 import logging
 from kafka import KafkaProducer
+import pandas as pd
+import csv
 
 # Logging Configuration
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -37,13 +39,33 @@ def check_and_create_kafka_topic(topic_name):
         logger.error("Error checking or creating Kafka topic: %s", str(e))
 
 # Fetch data from SQLite and join 'indicators', 'pulses', and 'ip_location'
+import sqlite3
+import csv
+import logging
+
+# Set up logger
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
+
+# Fetch data from SQLite and join 'indicators', 'pulses', and 'ip_location'
+import sqlite3
+import csv
+import logging
+
+# Set up logger
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
+
+# Fetch data from SQLite and join 'indicators', 'pulses', and 'ip_location'
+
+# Fetch data from SQLite and join 'indicators', 'pulses', and 'ip_location'
 def fetch_joined_data(db_file, row_limit):
     try:
         logger.info("Connecting to SQLite database '%s'...", db_file)
         conn = sqlite3.connect(db_file)
         cursor = conn.cursor()
 
-        # SQL query to join three tables: 'indicators', 'pulses', 'ip_location'
+        # SQL query to join three tables: 'indicators', 'pulses', and 'ip_location'
         logger.info("Fetching data from SQLite with join query...")
         join_query = """
         SELECT 
@@ -74,15 +96,11 @@ def fetch_joined_data(db_file, row_limit):
             loc.latitude AS location_latitude,
             loc.longitude AS location_longitude
         FROM 
-            indicators AS ind
-        INNER JOIN 
             pulses AS pul
-        ON 
-            ind.pulse_id = pul.id
-        INNER JOIN
-            ip_location AS loc
-        ON
-            ind.indicator = loc.ip
+        JOIN 
+            indicators AS ind ON pul.id = ind.pulse_id
+        JOIN 
+            ip_location AS loc ON loc.ip = SUBSTR(SUBSTR(pul.description, INSTR(pul.description, 'IP: ') + 4), 1, INSTR(SUBSTR(pul.description, INSTR(pul.description, 'IP: ') + 4), ',') - 1)
         LIMIT ?;
         """
         cursor.execute(join_query, (row_limit,))
@@ -93,16 +111,33 @@ def fetch_joined_data(db_file, row_limit):
 
         # Convert rows to dictionary for easier usage
         joined_data = [dict(zip(joined_columns, row)) for row in joined_rows]
-
+        
         cursor.close()
         conn.close()
 
         logger.info("Successfully fetched %d rows from the database.", len(joined_data))
+        # Define the CSV file path
+        csv_file_path = 'joined_data.csv'
 
+        # Extracting the headers from the first dictionary
+        headers = joined_data[0].keys()
+
+        # Write data to the CSV file
+        with open(csv_file_path, mode='w', newline='') as file:
+            writer = csv.DictWriter(file, fieldnames=headers)
+            
+            # Write the header
+            writer.writeheader()
+            
+            # Write the rows
+            writer.writerows(joined_data)
+
+        print(f"Data has been written to {csv_file_path}")
         return joined_columns, joined_data
-    except sqlite3.Error as e:
-        logger.error("Error while fetching data from SQLite: %s", str(e))
-        return [], []
+    
+    except Exception as e:
+        logger.error("An error occurred while fetching and writing data: %s", e)
+        return None, None
 
 # Kafka Producer Configuration
 producer = KafkaProducer(
