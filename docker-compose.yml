@@ -38,6 +38,22 @@ services:
       retries: 3
     networks:
       - ransomware-net
+    command: ["jobmanager"]  # Run as JobManager by default
+
+  taskmanager:
+    image: apache/flink:1.16.0-scala_2.12
+    container_name: flink-taskmanager
+    environment:
+      - FLINK_PROPERTIES
+      - "KAFKA_BOOTSTRAP_SERVERS=kafka:9092"  # Kafka connection
+    expose:
+      - "6121"
+      - "6122"
+    depends_on:
+      - flink
+    command: ["taskmanager"]  # Run as TaskManager by default
+    networks:
+      - ransomware-net
 
   influxdb:
     image: influxdb:latest
