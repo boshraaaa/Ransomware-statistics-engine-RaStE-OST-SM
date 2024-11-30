@@ -1,0 +1,4 @@
+sktime
+pandas
+numpy
+influxdb-client

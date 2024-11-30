@@ -1,0 +1,129 @@
+version: '3.8'
+
+services:
+  zookeeper:
+    image: wurstmeister/zookeeper
+    container_name: zookeeper
+    ports:
+      - "2181:2181"
+    networks:
+      - ransomware-net
+    volumes:
+      - zookeeper-data:/var/lib/zookeeper  # Persist Zookeeper data
+
+  kafka:
+    image: wurstmeister/kafka
+    container_name: kafka
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_ADVERTISED_HOST_NAME: localhost
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+    networks:
+      - ransomware-net
+    volumes:
+      - kafka-data:/var/lib/kafka  # Persist Kafka data
+
+  flink:
+    image: apache/flink:1.16.0-scala_2.12
+    container_name: flink
+    environment:
+      - FLINK_PROPERTIES
+    ports:
+      - "8081:8081"  # Flink Web UI
+    depends_on:
+      - kafka
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8081/jobmanager/overview || exit 1"]
+      interval: 30s
+      retries: 3
+    networks:
+      - ransomware-net
+
+  influxdb:
+    image: influxdb:2.1.1
+    container_name: influxdb
+    restart: always
+    ports:
+      - "8086:8086"  # Expose InfluxDB port
+    environment:
+      DOCKER_INFLUXDB_INIT_MODE: setup
+      DOCKER_INFLUXDB_INIT_USERNAME: admin
+      DOCKER_INFLUXDB_INIT_PASSWORD: admin
+      DOCKER_INFLUXDB_INIT_ORG: my-org
+      DOCKER_INFLUXDB_INIT_BUCKET: ransomware_bucket
+    networks:
+      - ransomware-net
+    volumes:
+      - influxdb-data:/var/lib/influxdb  # Volume for InfluxDB data persistence
+
+  grafana:
+    image: grafana/grafana:9.3.0
+    container_name: grafana
+    ports:
+      - "3000:3000"  # Expose Grafana port
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    depends_on:
+      - influxdb
+    networks:
+      - ransomware-net
+    volumes:
+      - grafana-data:/var/lib/grafana  # Volume for Grafana data persistence
+
+  producer:
+    image: python:3.11-slim
+    container_name: producer
+    build:
+      context: ./producer
+    working_dir: /app
+    volumes:
+      - ./producer:/app
+    environment:
+      KAFKA_BROKER: kafka:9092
+    depends_on:
+      - kafka
+    networks:
+      - ransomware-net
+    command: ["python", "producer.py"]
+
+  flink_consumer:
+    image: python:3.11-slim
+    container_name: flink_consumer
+    build:
+      context: ./flink_consumer
+    working_dir: /app
+    volumes:
+      - ./flink_consumer:/app
+    depends_on:
+      - flink
+      - kafka
+      - influxdb
+    networks:
+      - ransomware-net
+    command: ["python", "flink_consumer.py"]
+
+  time_series_analysis:
+    image: python:3.11-slim
+    container_name: time_series_analysis
+    build:
+      context: ./analysis
+    working_dir: /app
+    volumes:
+      - ./analysis:/app
+    depends_on:
+      - influxdb
+    networks:
+      - ransomware-net
+    command: ["python", "time_series_analysis.py"]
+
+networks:
+  ransomware-net:
+    driver: bridge
+
+volumes:
+  kafka-data:       # Persist Kafka data
+  zookeeper-data:   # Persist Zookeeper data
+  influxdb-data:    # Persist InfluxDB data
+  grafana-data:     # Persist Grafana data
