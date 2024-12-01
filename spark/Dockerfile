@@ -1,14 +1,18 @@
 # Use the official Apache Spark image as the base
-FROM bitnami/spark:latest
+FROM python:3.11-slim
 
-COPY requirements.txt .
+# Set the working directory
+WORKDIR /app
 
+# Install Python and pip
+RUN apt-get update && apt-get install -y python3 python3-pip
 
-# Install Python dependencies for Spark
-RUN pip install --no-cache-dir -r requirements.txt
+# Copy dependency file and install requirements
+COPY requirements.txt /app/
+RUN pip3 install --no-cache-dir -r requirements.txt
 
-# Copy your Spark consumer application script into the container
-COPY spark_consumer.py .
+# Copy application script
+COPY spark_consumer.py /app/
 
-# Set the default command to run the Spark application
-CMD ["python", "spark_consumer.py"]
+# Set default command to run the Spark application
+CMD ["python3", "spark_consumer.py"]

@@ -122,7 +122,7 @@ services:
 
   # PySpark Service - Spark Master
   spark-master:
-    image: bitnami/spark:3.3.1
+    image: bitnami/spark:3.4.0
     container_name: spark-master
     environment:
       - SPARK_MODE=master
@@ -139,7 +139,7 @@ services:
 
   # PySpark Worker
   spark-worker:
-    image: bitnami/spark:3.3.1
+    image: bitnami/spark:3.4.0
     container_name: spark-worker
     environment:
       - SPARK_MODE=worker

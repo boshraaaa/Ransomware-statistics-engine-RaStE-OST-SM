@@ -1,12 +1,20 @@
-FROM apache/flink:1.16.0-scala_2.12
+# Use a slim Python image as the base
+FROM python:3.11-slim
 
-# Install Python and dependencies
-RUN apt-get update && apt-get install -y python3 python3-pip
-COPY requirements.txt /tmp/requirements.txt
-RUN pip3 install -r /tmp/requirements.txt
-
-# Copy all Python files into the container
+# Set the working directory in the container
 WORKDIR /app
-COPY . /app/
 
+# Copy the local flink_consumer directory to the container
+COPY ./flink_consumer /app
+
+# Install necessary dependencies
+RUN pip install --no-cache-dir \
+    pyflink \
+    pandas \
+    scikit-learn \
+    influxdb-client \
+    kafka-python \
+    numpy
+
+# Set the default command to run the Flink job
 CMD ["python3", "flink_job.py"]
