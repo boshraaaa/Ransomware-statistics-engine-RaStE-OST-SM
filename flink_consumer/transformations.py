@@ -11,3 +11,4 @@ def process_stream(stream):
         .map(lambda x: {"measurement": "top_countries", "tags": {"country": x[0]}, "fields": {"count": x[1]}})
 
     return top_countries_stream
+
