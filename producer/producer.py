@@ -14,8 +14,8 @@ logger = logging.getLogger(__name__)
 KAFKA_BROKER = 'localhost:9092'  # Update with the appropriate host
 KAFKA_INDICATORS_TOPIC = 'indicators_topic'
 
-CSV_FILE_PATH = r"C:/Users/I745988/Ransomware-attack/data/sub_final.csv"  # Path to the CSV file
-ROW_LIMIT = 10000000000  # Limit the number of rows fetched (you can adjust this based on need)
+CSV_FILE_PATH = r"data/enriched_data.csv"  # Path to the CSV file
+ROW_LIMIT = 1000  # Limit the number of rows fetched (you can adjust this based on need)
 
 # Kafka Topic Creation Check
 def check_and_create_kafka_topic(topic_name):

@@ -1,19 +1,18 @@
-from pyspark.sql import SparkSession
-from pyspark.sql.functions import from_json, col
-from pyspark.sql.types import *
+import pandas as pd
+import time
 import logging
 from influxdb_client import InfluxDBClient, Point, BucketRetentionRules
-import time
-from datetime import datetime
-import pandas as pd
+import socket
+import struct
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
-import pandas as pd
-import socket
-import struct
-from sklearn.preprocessing import LabelEncoder, StandardScaler
+from sklearn.cluster import KMeans
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import from_json, col
+from pyspark.sql.types import *
+from datetime import datetime
 
 # Logging Configuration
 logging.basicConfig(level=logging.INFO)
@@ -35,12 +34,19 @@ spark = SparkSession.builder \
     .config("spark.jars.packages", "org.apache.spark:spark-sql-kafka-0-10_2.12:3.4.0") \
     .config("spark.network.timeout", "600s") \
     .config("spark.executor.heartbeatInterval", "100s") \
+    .config("spark.executor.memory", "4g") \
+    .config("spark.driver.memory", "4g") \  
     .getOrCreate()
 spark.sparkContext.setLogLevel('ERROR')
 
 # Initialize InfluxDB Client
 influx_client = InfluxDBClient(url=INFLUXDB_HOST, token=AUTH_TOKEN, org=DEFAULT_ORGANIZATION)
 write_api = influx_client.write_api()
+
+# Updated InfluxDB table names for different tasks
+PREDICTION_TABLE = "prediction_data"
+CLUSTERING_TABLE = "clustering_data"
+STREAM_PROCESSING_TABLE = "indicator_data"
 
 # Ensure Bucket Exists
 def ensure_bucket_exists():
@@ -65,7 +71,7 @@ def ensure_bucket_exists():
         logger.error(f"Error checking/creating bucket: {e}")
 
 # Retry logic for writing to InfluxDB
-def write_with_retry(write_api, point, retries=3, delay=5):
+def write_with_retry(write_api, point, retries=5, delay=2):
     for attempt in range(retries):
         try:
             write_api.write(bucket=DEFAULT_BUCKET, org=DEFAULT_ORGANIZATION, record=point)
@@ -77,7 +83,6 @@ def write_with_retry(write_api, point, retries=3, delay=5):
                 time.sleep(delay)
             else:
                 logger.error(f"Failed to write record after {retries} attempts: {e}")
-
 
 # Function to convert IP to integer representation
 def ip_to_int(ip):
@@ -108,7 +113,6 @@ def preprocess_data(df):
     
     for column in categorical_columns:
         if column in df.columns:
-            # Label encode the column, ensuring to handle non-string data types
             df[column] = label_encoder.fit_transform(df[column].astype(str))
 
     # Step 3: Encode IP addresses to integer representation
@@ -132,134 +136,113 @@ def preprocess_data(df):
 
     return df
 
-# Kafka Stream Schema
-schema = StructType([
-    StructField('id_indicator', LongType(), True),
-    StructField('indicator', StringType(), True),
-    StructField('type', StringType(), True),
-    StructField('created_indicator', StringType(), True),
-    StructField('content', StringType(), True),
-    StructField('title', StringType(), True),
-    StructField('description_indicator', StringType(), True),
-    StructField('expiration', StringType(), True),
-    StructField('is_active', IntegerType(), True),
-    StructField('id_pulse', StringType(), True),
-    StructField('name', StringType(), True),
-    StructField('description_pulse', StringType(), True),
-    StructField('author_name', StringType(), True),
-    StructField('modified', StringType(), True),
-    StructField('created_pulse', StringType(), True),
-    StructField('public', IntegerType(), True),
-    StructField('adversary', StringType(), True),
-    StructField('TLP', StringType(), True),
-    StructField('revision', IntegerType(), True),
-    StructField('in_group', IntegerType(), True),
-    StructField('is_subscribing', StringType(), True),
-    StructField('malware_family', StringType(), True),
-    StructField('ip', StringType(), True),
-    StructField('source_city', StringType(), True),
-    StructField('source_country', StringType(), True),
-    StructField('source_latitude', DoubleType(), True),
-    StructField('source_longitude', DoubleType(), True),
-    StructField('target_country', StringType(), True),
-    StructField('target_latitude', DoubleType(), True),
-    StructField('target_longitude', DoubleType(), True),
-])
+# Function to write prediction data to InfluxDB
+def write_prediction_to_influx(pandas_df, source_predictions, target_predictions, malware_predictions):
+    for i, record in pandas_df.iterrows():
+        created_indicator = int(time.time() * 1e9)
+        point = Point(PREDICTION_TABLE) \
+            .tag("source_country", source_predictions[i]) \
+            .tag("target_country", target_predictions[i]) \
+            .tag("malware_family", malware_predictions[i]) \
+            .field("ip", record['ip']) \
+            .field("source_city", record['source_city']) \
+            .time(created_indicator)
+        write_with_retry(write_api, point)
 
+# Function to write clustering data to InfluxDB
+def write_clustering_to_influx(pandas_df, cluster_predictions):
+    for i, record in pandas_df.iterrows():
+        created_indicator = int(time.time() * 1e9)
+        point = Point(CLUSTERING_TABLE) \
+            .tag("cluster", str(cluster_predictions[i])) \
+            .field("source_city", record['source_city']) \
+            .field("ip", record['ip']) \
+            .time(created_indicator)
+        write_with_retry(write_api, point)
+
+# Function to train classification models
 def train_classification_model(df):
     logger.info("Training classification models for source country, target country, and malware family...")
 
-    # Ensure 'created_indicator' is correctly converted to Unix timestamp (int64)
     df['created_indicator_timestamp'] = pd.to_datetime(df['created_indicator'], errors='coerce').astype('int64') / 10**9  # Convert to Unix timestamp in seconds
 
-    # Use the timestamp in the feature set
     X = df[['source_latitude', 'source_longitude', 'target_latitude', 'target_longitude', 'created_indicator_timestamp']]
     y_source = df['source_country']
     y_target = df['target_country']
     y_malware = df['malware_family']
     
-    # Train test split
     X_train, X_test, y_source_train, y_source_test = train_test_split(X, y_source, test_size=0.2, random_state=42)
     _, _, y_target_train, y_target_test = train_test_split(X, y_target, test_size=0.2, random_state=42)
     _, _, y_malware_train, y_malware_test = train_test_split(X, y_malware, test_size=0.2, random_state=42)
     
-    # Random Forest Classifier for source country prediction
     rf_source = RandomForestClassifier(n_estimators=100, random_state=42)
     rf_source.fit(X_train, y_source_train)
     source_predictions = rf_source.predict(X_test)
     source_accuracy = accuracy_score(y_source_test, source_predictions)
-    logger.info(f"Source country prediction accuracy: {source_accuracy * 100:.2f}%")
+    logger.info(f"Source Country Prediction Accuracy: {source_accuracy:.2f}")
 
-    # Random Forest Classifier for target country prediction
     rf_target = RandomForestClassifier(n_estimators=100, random_state=42)
     rf_target.fit(X_train, y_target_train)
     target_predictions = rf_target.predict(X_test)
     target_accuracy = accuracy_score(y_target_test, target_predictions)
-    logger.info(f"Target country prediction accuracy: {target_accuracy * 100:.2f}%")
+    logger.info(f"Target Country Prediction Accuracy: {target_accuracy:.2f}")
 
-    # Random Forest Classifier for malware family prediction
     rf_malware = RandomForestClassifier(n_estimators=100, random_state=42)
     rf_malware.fit(X_train, y_malware_train)
     malware_predictions = rf_malware.predict(X_test)
     malware_accuracy = accuracy_score(y_malware_test, malware_predictions)
-    logger.info(f"Malware family prediction accuracy: {malware_accuracy * 100:.2f}%")
+    logger.info(f"Malware Family Prediction Accuracy: {malware_accuracy:.2f}")
 
-    return rf_source, rf_target, rf_malware
+    return rf_source, rf_target, rf_malware, source_predictions, target_predictions, malware_predictions
 
+# Function to process the Kafka stream and handle batching
+def process_batch(df, epoch_id):
+    # Preprocess, classify, cluster, and write results as before
+    pandas_df = df.toPandas()  # Convert to Pandas DataFrame for further processing
+    preprocessed_df = preprocess_data(pandas_df)
 
+    # Perform clustering
+    kmeans = KMeans(n_clusters=3, random_state=42)
+    kmeans.fit(preprocessed_df[['source_latitude', 'source_longitude', 'target_latitude', 'target_longitude']])
+    cluster_predictions = kmeans.predict(preprocessed_df[['source_latitude', 'source_longitude', 'target_latitude', 'target_longitude']])
 
+    # Perform classification
+    rf_source, rf_target, rf_malware, source_predictions, target_predictions, malware_predictions = train_classification_model(preprocessed_df)
 
-def process_batch(batch_df, batch_id):
-    logger.info(f"Processing batch: {batch_id}")
-    try:
-        if batch_df.count() > 0:
-            # Convert Spark DataFrame to Pandas (for simplicity)
-            pandas_df = batch_df.toPandas()
+    # Write to InfluxDB
+    write_prediction_to_influx(preprocessed_df, source_predictions, target_predictions, malware_predictions)
+    write_clustering_to_influx(preprocessed_df, cluster_predictions)
 
-            # Preprocess the data
-            pandas_df = preprocess_data(pandas_df)
+# Kafka stream processing
+schema = StructType([
+    StructField("source_ip", StringType(), True),
+    StructField("source_city", StringType(), True),
+    StructField("source_country", StringType(), True),
+    StructField("target_ip", StringType(), True),
+    StructField("target_city", StringType(), True),
+    StructField("target_country", StringType(), True),
+    StructField("created_indicator", StringType(), True),
+    StructField("malware_family", StringType(), True),
+])
 
-            # Train the classification models
-            rf_source, rf_target, rf_malware = train_classification_model(pandas_df)
-
-            # Predict on new data
-            source_predictions = rf_source.predict(pandas_df[['source_latitude', 'source_longitude', 'target_latitude', 'target_longitude', 'created_indicator_timestamp']])
-            target_predictions = rf_target.predict(pandas_df[['source_latitude', 'source_longitude', 'target_latitude', 'target_longitude', 'created_indicator_timestamp']])
-            malware_predictions = rf_malware.predict(pandas_df[['source_latitude', 'source_longitude', 'target_latitude', 'target_longitude', 'created_indicator_timestamp']])
-
-            # Write Predicted Results to InfluxDB
-            for i, record in pandas_df.iterrows():
-                created_indicator = int(time.time()*1e9)
-                point = Point("indicator_data").tag("source_country", source_predictions[i]) \
-                    .tag("target_country", target_predictions[i]) \
-                    .tag("malware_family", malware_predictions[i]) \
-                    .time(created_indicator)
-                write_with_retry(write_api, point)
-        else:
-            logger.info("No data in this batch.")
-    except Exception as e:
-        logger.error(f"Error processing batch {batch_id}: {e}")
-
-
-# Ensure Bucket Exists Before Starting Stream
-ensure_bucket_exists()
-
-# Kafka Input Stream
-kafka_stream = spark.readStream.format("kafka") \
+stream_df = spark.readStream \
+    .format("kafka") \
     .option("kafka.bootstrap.servers", KAFKA_BROKER) \
     .option("subscribe", KAFKA_TOPIC) \
-    .option("startingOffsets", "earliest") \
-    .load()
+    .load() \
+    .selectExpr("CAST(value AS STRING)") \
+    .select(from_json("value", schema).alias("data")) \
+    .select("data.*")
 
-# Parse JSON Data from Kafka
-parsed_stream = kafka_stream.selectExpr("CAST(value AS STRING)") \
-    .select(from_json(col("value"), schema).alias("data")).select("data.*")
+# Ensure bucket exists before processing
+ensure_bucket_exists()
 
-# Write Stream Data to InfluxDB in Micro-Batches
-query = parsed_stream.writeStream \
+# Start processing the stream
+query = stream_df.writeStream \
     .foreachBatch(process_batch) \
     .outputMode("append") \
-    .trigger(processingTime="10 seconds") \
     .start()
 
-query.awaitTermination()
+query.awaitTermination()  # Wait for the stream to finish processing
+
+
