@@ -1,0 +1,6 @@
+# Requirements for Spark and Kafka integration
+pyspark==3.4.0  # Adjust the version based on your Spark version
+kafka-python==2.0.2  # Kafka client for Python
+influxdb-client==1.34.0  # InfluxDB Python client
+findspark==2.0.1  # A helper library to locate Spark
+pandas==1.5.3  # For data manipulation

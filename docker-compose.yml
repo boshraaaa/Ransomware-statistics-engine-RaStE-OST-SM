@@ -1,0 +1,179 @@
+version: '3.8'
+
+services:
+  zookeeper:
+    image: wurstmeister/zookeeper
+    container_name: zookeeper
+    ports:
+      - "2181:2181"
+    networks:
+      - ransomware-net
+    volumes:
+      - zookeeper-data:/var/lib/zookeeper  # Persist Zookeeper data
+
+  kafka:
+    image: wurstmeister/kafka
+    container_name: kafka
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_ADVERTISED_HOST_NAME: localhost
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+    networks:
+      - ransomware-net
+    volumes:
+      - kafka-data:/var/lib/kafka  # Persist Kafka data
+
+  flink:
+    image: apache/flink:1.16.0-scala_2.12
+    container_name: flink
+    environment:
+      - FLINK_PROPERTIES=jobmanager.rpc.address=flink
+    ports:
+      - "8081:8081"  # Flink Web UI
+    depends_on:
+      - kafka
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8081/jobmanager/overview || exit 1"]
+      interval: 30s
+      retries: 3
+    networks:
+      - ransomware-net
+    command: ["jobmanager"]  # Run as JobManager by default
+
+  taskmanager:
+    image: apache/flink:1.16.0-scala_2.12
+    container_name: flink-taskmanager
+    environment:
+      - FLINK_PROPERTIES
+      - "KAFKA_BOOTSTRAP_SERVERS=kafka:9092"  # Kafka connection
+    expose:
+      - "6121"
+      - "6122"
+    depends_on:
+      - flink
+    command: ["taskmanager"]  # Run as TaskManager by default
+    networks:
+      - ransomware-net
+
+  influxdb:
+    image: influxdb:latest
+    container_name: influxdb
+    restart: always
+    ports:
+      - 8086:8086
+    volumes:
+      - influxdb-data:/var/lib/influxdb
+    environment:
+      - INFLUXDB_DB=${INFLUXDB_DB}
+      - INFLUXDB_USER_BUCKET=${DEFAULT_BUCKET}
+      - INFLUXDB_ADMIN_USER=${ADMIN_USERNAME}
+      - INFLUXDB_ADMIN_USER_PASSWORD=${ADMIN_PASSWORD}
+      - INFLUXDB_ADMIN_USER_TOKEN=${AUTH_TOKEN}
+    networks:
+      - ransomware-net
+
+  grafana:
+    image: grafana/grafana:9.3.0
+    container_name: grafana
+    ports:
+      - "3000:3000"  # Expose Grafana port
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    depends_on:
+      - influxdb
+    networks:
+      - ransomware-net
+    volumes:
+      - grafana-data:/var/lib/grafana  # Volume for Grafana data persistence
+
+  producer:
+    image: python:3.11-slim
+    container_name: producer
+    build:
+      context: ./producer
+    working_dir: /app
+    volumes:
+      - ./producer:/app
+    environment:
+      KAFKA_BROKER: kafka:9092
+    depends_on:
+      - kafka
+    networks:
+      - ransomware-net
+    command: ["python", "producer.py"]
+
+  time_series_analysis:
+    image: python:3.11-slim
+    container_name: time_series_analysis
+    build:
+      context: ./analysis
+    networks:
+      - ransomware-net
+    depends_on:
+      - influxdb
+    volumes:
+      - ./analysis:/app
+    working_dir: /app
+    command: ["python", "time_series_analysis.py"]
+
+  # PySpark Service - Spark Master
+  spark-master:
+    image: bitnami/spark:3.4.0
+    container_name: spark-master
+    environment:
+      - SPARK_MODE=master
+      - SPARK_MASTER_HOST=spark-master
+      - SPARK_MASTER_PORT=7077
+      - SPARK_UI_PORT=8080
+    ports:
+      - "7077:7077"  # Spark master port
+      - "8080:8080"  # Spark UI port
+    networks:
+      - ransomware-net
+    volumes:
+      - spark-master-data:/opt/bitnami/spark/data
+
+  # PySpark Worker
+  spark-worker:
+    image: bitnami/spark:3.4.0
+    container_name: spark-worker
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_MASTER=spark://spark-master:7077
+    depends_on:
+      - spark-master
+    networks:
+      - ransomware-net
+    volumes:
+      - spark-worker-data:/opt/bitnami/spark/data
+  spark:
+    build:
+      context: ./spark  # Path to the Spark Dockerfile and application script
+    container_name: spark-consumer
+    depends_on:
+      - kafka
+    networks:
+      - ransomware-net
+    environment:
+      - SPARK_MASTER_HOST=spark-master
+      - SPARK_MASTER_PORT=7077
+      - KAFKA_BROKER=kafka:9092
+    volumes:
+      - ./spark:/app  # Mount the local spark directory into the container
+    command: ["spark-submit", "--master", "local[*]", "/app/spark_consumer.py"]
+
+networks:
+  ransomware-net:
+    driver: bridge
+
+volumes:
+  kafka-data:       # Persist Kafka data
+  zookeeper-data:   # Persist Zookeeper data
+  influxdb-data:    # Persist InfluxDB data
+  grafana-data:     # Persist Grafana data
+  spark-master-data: # Persist Spark Master data
+  spark-worker-data: # Persist Spark Worker data
