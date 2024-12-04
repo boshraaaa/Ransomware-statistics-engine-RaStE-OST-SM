@@ -1,11 +1,89 @@
 from dash import Dash, dcc, html, Input, Output
 import plotly.express as px
 import pandas as pd
+from influxdb_client import InfluxDBClient
 
 # Create Dash App
 app = Dash(__name__)
 app.title = "Ransomware Dashboard"
 
+
+# Connection details
+url = "http://localhost:8086"  # Replace with your InfluxDB URL
+token = "mTe9pXgfncRUZco9AG3k5tXG1ruePoRhJq-LF2B29yJ6bHTaHMT7l3VkmtUYS9raJbDhTq4kOnTt65YvkAHygA=="  # Replace with your token
+org = "ransomeware"      # Replace with your organization
+bucket = "ransomware"         # Replace with your bucket
+
+
+try:
+    # Initialize the client
+    client = InfluxDBClient(url=url, token=token, org=org)
+
+    # Test the connection by fetching available buckets
+    buckets = client.buckets_api().find_buckets()
+    print("Connection successful! Buckets available:")
+    for bucket in buckets.buckets:
+        print(f"- {bucket.name}")
+
+except Exception as e:
+    print(f"Failed to connect to InfluxDB: {e}")
+finally:
+    client.close()
+
+# Function to fetch data from InfluxDB and return as a DataFrame
+def fetch_influxdb_data(query):
+    # Connect to InfluxDB
+    client = InfluxDBClient(url=url, token=token, org=org)
+    query_api = client.query_api()
+
+    # Run the query and return as a DataFrame
+    result = query_api.query_data_frame(query)
+    client.close()
+
+    return result
+
+# Function to return query data (similar format to mock data)
+def get_query_data(query_name):
+    if query_name == "top_10_targets_query":
+        # Define InfluxDB query to get top 10 targets (replace with your actual query)
+        query = '''
+        from(bucket: "ransomware")
+            |> range(start: -1y)  // Adjust the time range as needed
+            |> filter(fn: (r) => r._measurement == "attacks")
+            |> filter(fn: (r) => r._field == "target_country")
+            |> group(columns: ["target_country"])
+            |> count()
+            |> top(n: 10, columns: ["_value"])
+        '''
+        # Fetch the data from InfluxDB and format it
+        influx_data = fetch_influxdb_data(query)
+        # Rename the columns to match the mock data format
+        influx_data = influx_data.rename(columns={"target_country": "Country", "_value": "Count"})
+        # Return the first 10 rows
+        return influx_data.head(10)
+
+    elif query_name == "top_10_sources_query":
+        # Define InfluxDB query to get top 10 sources (replace with your actual query)
+        query = '''
+        from(bucket: "ransomware")
+            |> range(start: -1y)  // Adjust the time range as needed
+            |> filter(fn: (r) => r._measurement == "attacks")
+            |> filter(fn: (r) => r._field == "source_country")
+            |> group(columns: ["source_country"])
+            |> count()
+            |> top(n: 10, columns: ["_value"])
+        '''
+        # Fetch the data from InfluxDB and format it
+        influx_data = fetch_influxdb_data(query)
+        # Rename the columns to match the mock data format
+        influx_data = influx_data.rename(columns={"source_country": "Country", "_value": "Count"})
+        # Return the first 10 rows
+        return influx_data.head(10)
+
+    # Add similar queries for other dashboard visualizations
+    return pd.DataFrame()
+
+'''
 # Mock data for now (replace these with results from your queries)
 def get_query_data(query_name):
     if query_name == "top_10_targets_query":
@@ -21,7 +99,7 @@ def get_query_data(query_name):
     # Add additional mock data for other queries
     # ...
     return pd.DataFrame()
-
+'''
 # Define App Layout with Navigation
 app.layout = html.Div([
     html.H1("Ransomware Analysis Dashboard", style={"textAlign": "center"}),
