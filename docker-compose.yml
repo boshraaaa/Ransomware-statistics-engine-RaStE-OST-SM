@@ -166,6 +166,25 @@ services:
       - ./spark:/app  # Mount the local spark directory into the container
     command: ["spark-submit", "--master", "local[*]", "/app/spark_consumer.py"]
 
+  main:
+    build:
+      context: ./main  # Assuming the Dockerfile is inside the 'main' directory
+    container_name: ransomware-dashboard
+    ports:
+      - "8050:8050"  # Expose the Dash app on port 8050
+    networks:
+      - ransomware-net
+    depends_on:
+      - influxdb
+      - kafka  # If the Dash app depends on Kafka and InfluxDB
+    volumes:
+      - ./main:/app  # Mount the local directory to the container
+    environment:
+      - KAFKA_BROKER=kafka:9092  # Kafka broker for communication
+      - INFLUXDB_HOST=influxdb:8086  # InfluxDB host for data fetching
+    command: ["python", "app.py"]  # Command to run the Dash app
+
+
 networks:
   ransomware-net:
     driver: bridge
