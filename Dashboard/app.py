@@ -46,23 +46,21 @@ def fetch_influxdb_data(query):
 
 # Function to return query data (similar format to mock data)
 def get_query_data(query_name):
-    if query_name == "top_10_targets_query":
-        # Define InfluxDB query to get top 10 targets (replace with your actual query)
+    if query_name == "top_10_targets_per_country":
         query = '''
         from(bucket: "ransomware")
-            |> range(start: -1y)  // Adjust the time range as needed
-            |> filter(fn: (r) => r._measurement == "attacks")
-            |> filter(fn: (r) => r._field == "target_country")
-            |> group(columns: ["target_country"])
-            |> count()
-            |> top(n: 10, columns: ["_value"])
+        |> range(start: -5y)  // Adjust the time range as needed
+        |> filter(fn: (r) => r._measurement == "top_10_target_countries")
+        |> group(columns: ["target_country"])
+        |> sum(column: "_value")  // Sum the attack counts for each target_country
+        |> sort(columns: ["_value"], desc: true)
+        |> limit(n: 10)
         '''
-        # Fetch the data from InfluxDB and format it
         influx_data = fetch_influxdb_data(query)
-        # Rename the columns to match the mock data format
-        influx_data = influx_data.rename(columns={"target_country": "Country", "_value": "Count"})
-        # Return the first 10 rows
-        return influx_data.head(10)
+        print("Fetched data from InfluxDB:")
+        print(influx_data.head(10))
+        return influx_data.rename(columns={"target_country": "Country", "_value": "Attack Count"})
+    
 
     elif query_name == "top_10_sources_query":
         # Define InfluxDB query to get top 10 sources (replace with your actual query)
@@ -133,35 +131,55 @@ def render_dashboard(tab_name):
         return render_dashboard_5()
 
 def render_dashboard_1():
-    # Mock data for demonstration (replace these with your query results)
-    top_10_targets = get_query_data("top_10_targets_query")
-    top_10_sources = get_query_data("top_10_sources_query")
+    try:
+        # Fetch data for top 10 targets
+        top_10_targets = get_query_data("top_10_targets_per_country")
+        
+        # Validate if the DataFrame is not empty and contains required columns
+        if top_10_targets.empty:
+            raise ValueError("No data available for top 10 targets.")
 
-    # Map visualization for Top 10 Targeted Countries
-    fig_targets = px.choropleth(
-        top_10_targets,
-        locations="Country",  # Column with country codes or names
-        locationmode="country names",  # Can be "ISO-3" or "country names"
-        color="Count",  # Data to be displayed on the map
-        title="Top 10 Targeted Countries",
-        color_continuous_scale=px.colors.sequential.Plasma
-    )
+        if not all(col in top_10_targets.columns for col in ["Country", "Attack Count"]):
+            raise ValueError("Missing required columns: 'Country' and 'Attack Count' in the data.")
 
-    # Map visualization for Top 10 Threat Source Countries
-    fig_sources = px.choropleth(
-        top_10_sources,
-        locations="Country",
-        locationmode="country names",
-        color="Count",
-        title="Top 10 Threat Source Countries",
-        color_continuous_scale=px.colors.sequential.Viridis
-    )
+        # Create a choropleth map
+        fig_choropleth = px.choropleth(
+            top_10_targets,
+            locations="Country",
+            locationmode="country names",  # Ensure that country names match Plotly's format
+            color="Attack Count",
+            hover_name="Country",
+            title="Top 10 Target Countries by Attack Count",
+            color_continuous_scale=px.colors.sequential.Plasma
+        )
 
-    # Return two maps side-by-side
-    return html.Div([
-        html.Div([dcc.Graph(figure=fig_targets)], style={"width": "48%", "display": "inline-block"}),
-        html.Div([dcc.Graph(figure=fig_sources)], style={"width": "48%", "display": "inline-block"}),
-    ])
+        # Adjust layout
+        fig_choropleth.update_layout(
+            geo=dict(
+                showframe=False,
+                showcoastlines=True,
+                projection_type="natural earth"
+            ),
+            margin={"r": 0, "t": 40, "l": 0, "b": 0}
+        )
+
+        # Return the choropleth map
+        return html.Div([
+            html.Div([dcc.Graph(figure=fig_choropleth)], style={"width": "100%", "display": "block"}),
+        ])
+    except ValueError as e:
+        # Handle specific errors gracefully
+        return html.Div([
+            html.H3("Error in Rendering Dashboard", style={"color": "red"}),
+            html.P(str(e))
+        ])
+    except Exception as e:
+        # Catch-all for unexpected errors
+        return html.Div([
+            html.H3("Unexpected Error", style={"color": "red"}),
+            html.P(str(e))
+        ])
+
 
 
 # Add similar functions for other dashboards (Dashboard 2 to Dashboard 5)

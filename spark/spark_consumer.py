@@ -40,10 +40,11 @@ KAFKA_TOPIC = 'indicators_topic'
 # InfluxDB Configuration
 INFLUXDB_HOST = 'http://localhost:8086'
 AUTH_TOKEN = 'JkLVh_Glxl0FfIHnJM3C8HZOVvY_kG_spqDAJ4yK2HlhH7ia6oQqLf5IOy2XpvzMVlThyoFVjiAfsztM_CE8vw==' 
-DEFAULT_BUCKET = 'ransomware'
-PREDICTION_BUCKET = 'prediction'
 DEFAULT_ORGANIZATION = 'ransomeware'
-FORCAST_BUCKET = "forcast"
+# Buckets
+DEFAULT_BUCKET = 'ransomware' # for the 10 pipelines
+PREDICTION_BUCKET = 'prediction' # for clustering
+FORCAST_BUCKET = "forcast" # for forcast
 
 #------------- Initialize Spark Session ---------------------------------#
 spark = SparkSession.builder \
@@ -222,7 +223,7 @@ def process_batch(batch_df):
         predictions = rf_model.predict(pandas_df)
         logger.info(f"Predictions completed. Predictions shape: {predictions.shape}")
         logger.info(f"Prediction output DataFrame:\n{predictions.columns}")
-        # Write predictions to InfluxDB
+        # Write to InfluxDB
         for _, record in predictions.iterrows():
             try:
                 point = Point("indicator_predictions") \
@@ -611,8 +612,8 @@ def process_all_pipelines(batch_df, batch_id):
 
     batch_df.cache()  # Cache the shared dataset to avoid redundant computation
     logger.info("==============PREDICTION==============================")
-    process_batch(batch_df)
-    process_clustering(batch_df)
+    process_batch(batch_df) #forcasting
+    process_clustering(batch_df) #Clustering
     logger.info("Top 10 target countries")
     pipeline_top_10_targets_per_country(batch_df)
     logger.info("Top 10 threat sources")
