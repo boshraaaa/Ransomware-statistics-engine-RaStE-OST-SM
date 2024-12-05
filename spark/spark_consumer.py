@@ -318,7 +318,7 @@ def pipeline_detect_target_country_changes(batch_df):
     result = batch_df \
         .groupBy(
             "target_country",
-            window(col("created_indicator"), "10 minutes")
+            window(col("created_indicator"), "24 hours")
         ) \
         .agg(count("*").alias("count")) 
     sorted_stream = result.orderBy("window", ascending=True)
@@ -337,7 +337,7 @@ def pipeline_detect_source_country_changes(batch_df):
     result = batch_df \
         .groupBy(
             "source_country",
-            window(col("created_indicator"), "10 minutes") 
+            window(col("created_indicator"), "24 hours") 
         ) \
         .agg(count("*").alias("attack_count")) 
     sorted_stream = result.orderBy("window", ascending=True)

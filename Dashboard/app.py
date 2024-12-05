@@ -44,6 +44,37 @@ def fetch_influxdb_data(query):
 
     return result
 
+def fetch_target_country_changes():
+    query = '''
+    from(bucket: "ransomware")
+        |> range(start: -1y)
+        |> filter(fn: (r) => r._measurement == "detect_target_country_changes")
+        |> group(columns: ["target_country", "window"])
+        |> sort(columns: ["_time"], desc: false)
+    '''
+    influx_data = fetch_influxdb_data(query)
+    influx_data = influx_data.rename(columns={"_value": "Change Count", "target_country": "Country", "_time": "Timestamp"})
+    influx_data["Timestamp"] = pd.to_datetime(influx_data["Timestamp"])
+    print("Target Country Changes Data:")
+    print(influx_data.head())
+    return influx_data
+
+def fetch_source_country_changes():
+    query = '''
+    from(bucket: "ransomware")
+        |> range(start: -1y)
+        |> filter(fn: (r) => r._measurement == "detect_source_country_changes")
+        |> group(columns: ["source_country", "window"])
+        |> sort(columns: ["_time"], desc: false)
+    '''
+    influx_data = fetch_influxdb_data(query)
+    influx_data = influx_data.rename(columns={"_value": "Change Count", "source_country": "Country", "_time": "Timestamp"})
+    influx_data["Timestamp"] = pd.to_datetime(influx_data["Timestamp"])
+    print("Source Country Changes Data:")
+    print(influx_data.head())
+    return influx_data
+
+
 # Function to return query data (similar format to mock data)
 def get_query_data(query_name):
     if query_name == "top_10_targets_per_country":
@@ -60,25 +91,133 @@ def get_query_data(query_name):
         print("Fetched data from InfluxDB:")
         print(influx_data.head(10))
         return influx_data.rename(columns={"target_country": "Country", "_value": "Attack Count"})
-    
+    elif query_name == "top_10_threat_sources":
+        query = '''
+        from(bucket: "ransomware")
+            |> range(start: -1y)
+            |> filter(fn: (r) => r._measurement == "top_10_source_countries")
+            |> group(columns: ["source_country"])
+            |> sort(columns: ["_value"], desc: true)
+            |> limit(n: 10)
+        '''
+        influx_data = fetch_influxdb_data(query)
+        print("Fetched data for top 10 threat sources:")
+        print(influx_data.head(10))
+        return influx_data.rename(columns={"source_country": "Country", "_value": "Attack Count"})
 
-    elif query_name == "top_10_sources_query":
-        # Define InfluxDB query to get top 10 sources (replace with your actual query)
+    elif query_name == "target_country_changes":
+        # Query for target country changes
+        query = '''
+        from(bucket: "ransomware")
+            |> range(start: -5y)
+            |> filter(fn: (r) => r._measurement == "detect_target_country_changes")
+            |> group(columns: ["target_country", "window"])
+            |> sort(columns: ["_time"], desc: false)
+        '''
+        influx_data = fetch_influxdb_data(query)
+        influx_data = influx_data.rename(columns={"_value": "Change Count", "target_country": "Country", "_time": "Timestamp"})
+        influx_data["Timestamp"] = pd.to_datetime(influx_data["Timestamp"])
+        return influx_data
+
+    elif query_name == "source_country_changes":
+        # Query for source country changes
+        query = '''
+        from(bucket: "ransomware")
+            |> range(start: -5y)
+            |> filter(fn: (r) => r._measurement == "detect_source_country_changes")
+            |> group(columns: ["source_country", "window"])
+            |> sort(columns: ["_time"], desc: false)
+        '''
+        influx_data = fetch_influxdb_data(query)
+        influx_data = influx_data.rename(columns={"_value": "Change Count", "source_country": "Country", "_time": "Timestamp"})
+        influx_data["Timestamp"] = pd.to_datetime(influx_data["Timestamp"])
+        return influx_data
+    elif query_name == "top_10_active_ips":
+        # Query for top 10 active IPs
+        query = '''
+        from(bucket: "ransomware")
+            |> range(start: -1y)
+            |> filter(fn: (r) => r._measurement == "top_10_active_ips")
+            |> group(columns: ["ip"])
+            |> sort(columns: ["_value"], desc: true)
+            |> limit(n: 10)
+        '''
+        influx_data = fetch_influxdb_data(query)
+        influx_data = influx_data.rename(columns={"ip": "IP Address", "_value": "Attack Count"})
+        return influx_data
+
+    elif query_name == "top_attack_type":
+        # Query for top attack type
+        query = '''
+        from(bucket: "ransomware")
+            |> range(start: -1y)
+            |> filter(fn: (r) => r._measurement == "top_attack_type")
+            |> group(columns: ["type"])
+            |> sort(columns: ["_value"], desc: true)
+            |> limit(n: 1)
+        '''
+        influx_data = fetch_influxdb_data(query)
+        influx_data = influx_data.rename(columns={"type": "Attack Type", "_value": "Attack Count"})
+        return influx_data
+    elif query_name == "top_10_authors":
+        # Define InfluxDB query to get top 10 authors
         query = '''
         from(bucket: "ransomware")
             |> range(start: -1y)  // Adjust the time range as needed
-            |> filter(fn: (r) => r._measurement == "attacks")
-            |> filter(fn: (r) => r._field == "source_country")
-            |> group(columns: ["source_country"])
-            |> count()
-            |> top(n: 10, columns: ["_value"])
+            |> filter(fn: (r) => r._measurement == "top_10_authors")
+            |> group(columns: ["author_name"])
+            |> sort(columns: ["_value"], desc: true)
+            |> limit(n: 10)
         '''
-        # Fetch the data from InfluxDB and format it
+        # Fetch the data from InfluxDB
         influx_data = fetch_influxdb_data(query)
-        # Rename the columns to match the mock data format
-        influx_data = influx_data.rename(columns={"source_country": "Country", "_value": "Count"})
-        # Return the first 10 rows
-        return influx_data.head(10)
+        # Rename columns to match visualization needs
+        influx_data = influx_data.rename(columns={"author_name": "Author Name", "_value": "Indicator Count"})
+        return influx_data
+
+    elif query_name == "top_10_cities":
+        # Define InfluxDB query to get top 10 cities
+        query = '''
+        from(bucket: "ransomware")
+            |> range(start: -1y)  // Adjust the time range as needed
+            |> filter(fn: (r) => r._measurement == "top_10_cities")
+            |> group(columns: ["source_city"])
+            |> sort(columns: ["_value"], desc: true)
+            |> limit(n: 10)
+        '''
+        # Fetch the data from InfluxDB
+        influx_data = fetch_influxdb_data(query)
+        # Rename columns to match visualization needs
+        influx_data = influx_data.rename(columns={"source_city": "City", "_value": "Attack Count"})
+        return influx_data
+    elif query_name == "attacks_by_creation_day":
+        query = '''
+        from(bucket: "ransomware")
+            |> range(start: -5y)  // Adjust time range as needed
+            |> filter(fn: (r) => r._measurement == "attack_by_creation_day")
+            |> group(columns: ["created_date"])
+            |> aggregateWindow(every: 1d, fn: sum, createEmpty: false)
+            |> sort(columns: ["_time"], desc: false)
+        '''
+        influx_data = fetch_influxdb_data(query)
+        influx_data = influx_data.rename(columns={"_time": "Date", "_value": "Attack Count"})
+        return influx_data
+
+    elif query_name == "attacks_by_creation_month":
+        query = '''
+        from(bucket: "ransomware")
+            |> range(start: -5y)  // Adjust time range as needed
+            |> filter(fn: (r) => r._measurement == "attacks_by_creation_month")
+            |> group(columns: ["year", "month"])
+            |> sort(columns: ["year", "month"], desc: false)
+        '''
+        influx_data = fetch_influxdb_data(query)
+        influx_data["Year-Month"] = influx_data["year"].astype(str) + "-" + influx_data["month"].astype(str).str.zfill(2)
+        influx_data = influx_data.rename(columns={"_value": "Attack Count"})
+        return influx_data
+
+    else:
+        raise ValueError(f"Unknown query_name: {query_name}")
 
     # Add similar queries for other dashboard visualizations
     return pd.DataFrame()
@@ -131,106 +270,211 @@ def render_dashboard(tab_name):
         return render_dashboard_5()
 
 def render_dashboard_1():
-    try:
-        # Fetch data for top 10 targets
-        top_10_targets = get_query_data("top_10_targets_per_country")
-        
-        # Validate if the DataFrame is not empty and contains required columns
-        if top_10_targets.empty:
-            raise ValueError("No data available for top 10 targets.")
+    # Fetch data for top 10 targets
+    top_10_targets = get_query_data("top_10_targets_per_country")
+    # Fetch data for top 10 threat sources
+    top_10_sources = get_query_data("top_10_threat_sources")
 
-        if not all(col in top_10_targets.columns for col in ["Country", "Attack Count"]):
-            raise ValueError("Missing required columns: 'Country' and 'Attack Count' in the data.")
+    # Create a choropleth map for targets
+    fig_choropleth_targets = px.choropleth(
+        top_10_targets,
+        locations="Country",
+        locationmode="country names",
+        color="Attack Count",
+        hover_name="Country",
+        title="Top 10 Target Countries by Attack Count",
+        color_continuous_scale=px.colors.sequential.Plasma
+    )
 
-        # Create a choropleth map
-        fig_choropleth = px.choropleth(
-            top_10_targets,
-            locations="Country",
-            locationmode="country names",  # Ensure that country names match Plotly's format
-            color="Attack Count",
-            hover_name="Country",
-            title="Top 10 Target Countries by Attack Count",
-            color_continuous_scale=px.colors.sequential.Plasma
-        )
+    # Adjust layout for targets map
+    fig_choropleth_targets.update_layout(
+        geo=dict(
+            showframe=False,
+            showcoastlines=True,
+            projection_type="natural earth"
+        ),
+        margin={"r": 0, "t": 40, "l": 0, "b": 0}
+    )
 
-        # Adjust layout
-        fig_choropleth.update_layout(
-            geo=dict(
-                showframe=False,
-                showcoastlines=True,
-                projection_type="natural earth"
-            ),
-            margin={"r": 0, "t": 40, "l": 0, "b": 0}
-        )
+    # Create a choropleth map for sources
+    fig_choropleth_sources = px.choropleth(
+        top_10_sources,
+        locations="Country",
+        locationmode="country names",
+        color="Attack Count",
+        hover_name="Country",
+        title="Top 10 Source Countries by Attack Count",
+        color_continuous_scale=px.colors.sequential.Sunset
+    )
 
-        # Return the choropleth map
-        return html.Div([
-            html.Div([dcc.Graph(figure=fig_choropleth)], style={"width": "100%", "display": "block"}),
-        ])
-    except ValueError as e:
-        # Handle specific errors gracefully
-        return html.Div([
-            html.H3("Error in Rendering Dashboard", style={"color": "red"}),
-            html.P(str(e))
-        ])
-    except Exception as e:
-        # Catch-all for unexpected errors
-        return html.Div([
-            html.H3("Unexpected Error", style={"color": "red"}),
-            html.P(str(e))
-        ])
+    # Adjust layout for sources map
+    fig_choropleth_sources.update_layout(
+        geo=dict(
+            showframe=False,
+            showcoastlines=True,
+            projection_type="natural earth"
+        ),
+        margin={"r": 0, "t": 40, "l": 0, "b": 0}
+    )
+
+    # Return both choropleth maps
+    return html.Div([
+        html.Div([dcc.Graph(figure=fig_choropleth_targets)], style={"width": "100%", "display": "block"}),
+        html.Div([dcc.Graph(figure=fig_choropleth_sources)], style={"width": "100%", "display": "block"}),
+    ])
 
 
 
 # Add similar functions for other dashboards (Dashboard 2 to Dashboard 5)
 # ...
 def render_dashboard_2():
-    # Mock data for target and source changes
-    target_changes = pd.DataFrame({"Country": ["US", "CN"], "Change": [10, -5]})
-    source_changes = pd.DataFrame({"Country": ["RU", "IN"], "Change": [15, -8]})
+    # Fetch data
+    target_changes = fetch_target_country_changes()
+    source_changes = fetch_source_country_changes()
 
-    fig_target_changes = px.bar(target_changes, x="Country", y="Change", title="Target Country Changes")
-    fig_source_changes = px.bar(source_changes, x="Country", y="Change", title="Source Country Changes")
+    # Create line chart for target country changes
+    fig_target_changes = px.line(
+        target_changes,
+        x="Timestamp",
+        y="Change Count",
+        color="Country",
+        title="Target Country Changes Over Time",
+        labels={"Change Count": "Change Count", "Timestamp": "Time"}
+    )
 
+    # Create line chart for source country changes
+    fig_source_changes = px.line(
+        source_changes,
+        x="Timestamp",
+        y="Change Count",
+        color="Country",
+        title="Source Country Changes Over Time",
+        labels={"Change Count": "Change Count", "Timestamp": "Time"}
+    )
+
+    # Return the dashboard layout
     return html.Div([
-        dcc.Graph(figure=fig_target_changes),
-        dcc.Graph(figure=fig_source_changes)
+        html.Div([dcc.Graph(figure=fig_target_changes)], style={"width": "100%", "display": "block", "margin-bottom": "40px"}),
+        html.Div([dcc.Graph(figure=fig_source_changes)], style={"width": "100%", "display": "block"}),
     ])
+
 
 def render_dashboard_3():
-    active_ips = pd.DataFrame({
-        "IP": ["192.168.0.1", "192.168.0.2", "10.0.0.1", "10.0.0.2", "172.16.0.1"],
-        "Activity Count": [500, 400, 300, 200, 100]
-    })
+    # Fetch data for top 10 active IPs
+    top_10_ips = get_query_data("top_10_active_ips")
 
-    fig_active_ips = px.bar(active_ips, x="IP", y="Activity Count", title="Top 10 Active IPs")
+    # Fetch data for top attack type
+    top_attack_type = get_query_data("top_attack_type")
 
-    return html.Div([dcc.Graph(figure=fig_active_ips)])
+    # Create bar chart for top 10 active IPs
+    fig_ips = px.bar(
+        top_10_ips,
+        x="IP Address",
+        y="Attack Count",
+        title="Top 10 Active IPs by Attack Count",
+        labels={"Attack Count": "Number of Attacks", "IP Address": "IP Address"},
+        color="Attack Count",
+        color_continuous_scale=px.colors.sequential.Viridis
+    )
+    fig_ips.update_layout(margin={"r": 0, "t": 40, "l": 0, "b": 0})
+
+    # Create pie chart for top attack type
+    fig_attack_type = px.pie(
+        top_attack_type,
+        names="Attack Type",
+        values="Attack Count",
+        title="Top Attack Type",
+        color_discrete_sequence=["blue", "red"]
+    )
+    fig_attack_type.update_layout(margin={"r": 0, "t": 40, "l": 0, "b": 0})
+
+    # Return the dashboard layout
+    return html.Div([
+        html.Div([
+            html.H3("Dashboard 3: Active IPs and Attack Types", style={"textAlign": "center"}),
+            dcc.Graph(figure=fig_ips),
+            dcc.Graph(figure=fig_attack_type)
+        ], style={"width": "100%", "display": "block"}),
+    ])
+
 
 def render_dashboard_4():
-    attack_trends = pd.DataFrame({
-        "Time": ["2024-12-01", "2024-12-02", "2024-12-03"],
-        "Attacks": [100, 150, 200]
-    })
+    # Fetch data for top 10 authors
+    top_10_authors = get_query_data("top_10_authors")
 
-    fig_trends = px.line(attack_trends, x="Time", y="Attacks", title="Attack Trends Over Time")
+    # Fetch data for top 10 cities
+    top_10_cities = get_query_data("top_10_cities")
 
-    return html.Div([dcc.Graph(figure=fig_trends)])
+    # Create bar chart for top 10 authors
+    fig_authors = px.bar(
+        top_10_authors,
+        x="Author Name",
+        y="Indicator Count",
+        title="Top 10 Authors by Indicator Count",
+        labels={"Indicator Count": "Count", "Author Name": "Author Name"},
+        color="Indicator Count",
+        color_continuous_scale=px.colors.sequential.Blues
+    )
+    fig_authors.update_layout(margin={"r": 0, "t": 40, "l": 0, "b": 0})
+
+    # Create bar chart for top 10 cities
+    fig_cities = px.bar(
+        top_10_cities,
+        x="City",
+        y="Attack Count",
+        title="Top 10 Cities by Attack Count",
+        labels={"Attack Count": "Number of Attacks", "City": "City"},
+        color="Attack Count",
+        color_continuous_scale=px.colors.sequential.Reds
+    )
+    fig_cities.update_layout(margin={"r": 0, "t": 40, "l": 0, "b": 0})
+
+    # Return the dashboard layout
+    return html.Div([
+        html.Div([
+            html.H3("Dashboard 4: Top Authors and Cities", style={"textAlign": "center"}),
+            dcc.Graph(figure=fig_authors),
+            dcc.Graph(figure=fig_cities)
+        ], style={"width": "100%", "display": "block"}),
+    ])
+
 
 def render_dashboard_5():
-    by_day = pd.DataFrame({"Day": ["2024-12-01", "2024-12-02"], "Count": [300, 250]})
-    by_month = pd.DataFrame({"Month": ["December"], "Count": [550]})
-    by_expiration = pd.DataFrame({"Date": ["2024-12-10"], "Count": [500]})
+    # Fetch data for daily attacks
+    daily_attacks = get_query_data("attacks_by_creation_day")
+    
+    # Fetch data for monthly attacks
+    monthly_attacks = get_query_data("attacks_by_creation_month")
 
-    fig_day = px.bar(by_day, x="Day", y="Count", title="Attacks by Creation Day")
-    fig_month = px.bar(by_month, x="Month", y="Count", title="Attacks by Creation Month")
-    fig_expiration = px.bar(by_expiration, x="Date", y="Count", title="Attacks by Expiration Date")
+    # Create a line chart for daily attacks
+    fig_daily = px.line(
+        daily_attacks,
+        x="Date",
+        y="Attack Count",
+        title="Daily Attacks Over Time",
+        labels={"Attack Count": "Number of Attacks", "Date": "Date"}
+    )
+    fig_daily.update_traces(line=dict(color="blue"))
 
+    # Create a bar chart for monthly attacks
+    fig_monthly = px.bar(
+        monthly_attacks,
+        x="Year-Month",
+        y="Attack Count",
+        title="Monthly Attacks Over Time",
+        labels={"Attack Count": "Number of Attacks", "Year-Month": "Month-Year"}
+    )
+    fig_monthly.update_traces(marker_color="green")
+
+    # Return the layout with both charts
     return html.Div([
-        dcc.Graph(figure=fig_day),
-        dcc.Graph(figure=fig_month),
-        dcc.Graph(figure=fig_expiration)
+        html.Div([
+            html.H3("Attack Trends Dashboard"),
+            dcc.Graph(figure=fig_daily),
+            dcc.Graph(figure=fig_monthly),
+        ], style={"width": "100%", "display": "block"}),
     ])
+
 
 
 
