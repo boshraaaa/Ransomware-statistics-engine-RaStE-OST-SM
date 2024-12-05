@@ -150,11 +150,6 @@ class RandomForestModel:
 
         return forecast_data
 
-rf = RandomForestModel(model_path="C:/Users/I745988/Ransomware-attack/spark/Models/Forcast/Forcastrandom_forest_model.pkl")
-import pandas as  pd
-df = pd.read_csv('C:/Users/I745988/Ransomware-attack/data/enriched_data.csv')
-df = rf.preprocess(df)
-pred = rf.predict(df)
-print(pred.head())
+
 
 

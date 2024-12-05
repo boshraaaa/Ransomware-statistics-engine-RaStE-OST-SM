@@ -11,8 +11,10 @@ logger = logging.getLogger(__name__)
 
 # Kafka Configuration
 KAFKA_BROKER = 'localhost:9092'
-KAFKA_INDICATORS_TOPIC = 'indicators_topic_API'
+KAFKA_INDICATORS_TOPIC = 'indicators_topic'
 PULSE_LIMIT = 10
+
+#kafka-topics.sh kafka-topics.sh --delete --topic indicators_topic --bootstrap-server localhost:9092
 
 # API Configuration
 CONFIG_FILE = "C:/Users/I745988/Ransomware-attack/producer/config.json"
