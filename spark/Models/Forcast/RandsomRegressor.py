@@ -1,6 +1,14 @@
 import pandas as pd
 from sklearn.preprocessing import LabelEncoder
 import joblib
+import logging
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 class RandomForestModel:
     def __init__(self, model_path):
@@ -17,22 +25,22 @@ class RandomForestModel:
     def preprocess(self, data):
         """
         Preprocess the incoming Pandas DataFrame to match the training data structure.
-        Includes:
-        - Label encoding categorical columns.
-        - Adding temporal features and lag features.
-        - Handling missing data.
         """
-        # Ensure required columns are present
-        required_columns = ['created_indicator', 'target_country', 'source_country', 'malware_family']
-        for col in required_columns:
-            if col not in data.columns:
-                data[col] = 'unknown' if col in ['target_country', 'source_country', 'malware_family'] else pd.NaT
+        logger.info(f"Original DataFrame shape: {data.shape}")
 
         # Convert created_indicator to datetime
         data['created_indicator'] = pd.to_datetime(data['created_indicator'], errors='coerce')
+        logger.info(f"Missing values in created_indicator: {data['created_indicator'].isnull().sum()}")
 
         # Drop rows with missing created_indicator
         data.dropna(subset=['created_indicator'], inplace=True)
+
+        # Handle missing target_country
+        if 'target_country' not in data.columns:
+            logger.error("Column 'target_country' is missing in the input data.")
+            raise ValueError("Column 'target_country' is required but missing.")
+        data['target_country'].fillna('unknown', inplace=True)
+        logger.info(f"Unique target_country values: {data['target_country'].unique()}")
 
         # Encode categorical columns
         for col in ['target_country', 'source_country', 'malware_family']:
@@ -50,6 +58,10 @@ class RandomForestModel:
         if 'num_attacks' not in data.columns:
             data['num_attacks'] = 0  # Default value for missing column
         aggregated_data = data.groupby(['target_country', 'created_indicator'])['num_attacks'].sum().reset_index()
+        logger.info(f"Aggregated DataFrame shape: {aggregated_data.shape}")
+        if aggregated_data.empty:
+            logger.error("Aggregated DataFrame is empty after grouping.")
+            raise ValueError("Aggregated DataFrame is empty. Check input data.")
 
         # Ensure no missing dates for each target_country
         complete_data = pd.DataFrame()
@@ -59,10 +71,24 @@ class RandomForestModel:
             country_data = country_data.reindex(
                 pd.date_range(country_data.index.min(), country_data.index.max(), freq='D'),
                 fill_value=0
-            ).reset_index()
-            country_data.columns = ['created_indicator', 'num_attacks']
-            country_data['target_country'] = country
+            )
+            country_data = country_data.reset_index()
+
+            if len(country_data.columns) == 3:  # Properly rename columns
+                country_data.columns = ['created_indicator', 'num_attacks', 'target_country']
+            elif len(country_data.columns) == 2:  # Handle cases without the target_country column
+                country_data.columns = ['created_indicator', 'num_attacks']
+                country_data['target_country'] = country
+            else:
+                logger.error(f"Unexpected number of columns in country_data: {len(country_data.columns)}")
+                raise ValueError("Unexpected number of columns in country_data during reindexing.")
+
             complete_data = pd.concat([complete_data, country_data], ignore_index=True)
+
+        logger.info(f"Complete DataFrame before lag features:\n{complete_data.head()}")
+        if complete_data.empty:
+            logger.error("Complete DataFrame is empty after reindexing.")
+            raise ValueError("Complete DataFrame is empty. Check reindexing logic.")
 
         # Add lag features
         for lag in [1, 7, 30]:
@@ -78,19 +104,20 @@ class RandomForestModel:
         complete_data['day_of_week'] = complete_data['created_indicator'].dt.dayofweek
         complete_data['is_weekend'] = complete_data['day_of_week'].apply(lambda x: 1 if x >= 5 else 0)
 
+        logger.info(f"Final preprocessed DataFrame shape: {complete_data.shape}")
         return complete_data
+
 
     def predict(self, df, forecast_days=730):
         """
         Predict the number of attacks using the pre-trained RandomForest model.
         Adds future predictions for the specified number of days.
         """
-        processed_df = self.preprocess(df)
-        if processed_df.empty:
+        if df.empty:
             raise ValueError("Processed DataFrame is empty after preprocessing.")
 
-        forecast_data = processed_df.copy()
-        feature_columns = [col for col in processed_df.columns if col not in ['created_indicator', 'num_attacks']]
+        forecast_data = df.copy()
+        feature_columns = [col for col in df.columns if col not in ['created_indicator', 'num_attacks']]
 
         # Generate future predictions
         last_date = forecast_data['created_indicator'].max()
@@ -121,4 +148,13 @@ class RandomForestModel:
             # Append to the forecast data
             forecast_data = pd.concat([forecast_data, pd.DataFrame([new_row])], ignore_index=True)
 
-        return forecast_data[['created_indicator', 'num_attacks']]
+        return forecast_data
+
+rf = RandomForestModel(model_path="C:/Users/I745988/Ransomware-attack/spark/Models/Forcast/Forcastrandom_forest_model.pkl")
+import pandas as  pd
+df = pd.read_csv('C:/Users/I745988/Ransomware-attack/data/enriched_data.csv')
+df = rf.preprocess(df)
+pred = rf.predict(df)
+print(pred.head())
+
+

@@ -201,43 +201,32 @@ def process_clustering(batch_df):
         logger.error(f"Error processing batch: {e}")
 
 #-----------------------Load the pre-trained RandomForestModel---------------------------#
-rf_model = RandomForestModel(model_path="C:/Users/I745988/Ransomware-attack/spark/Models/Forcast/Forcastrandom_forest_model.pkl")       
+rf_model = RandomForestModel(model_path="C:/Users/I745988/Ransomware-attack/spark/Models/Forcast/Forcastrandom_forest_model.pkl")  
+     
 def process_batch(batch_df):
     logger.info("============== Processing Batch ==============")
     try:
         if batch_df.isEmpty():
             logger.info("No data in this batch.")
             return
-
         # Convert Spark DataFrame to Pandas
         rows = batch_df.collect()
         pandas_df = pd.DataFrame(rows, columns=batch_df.columns)
-
-        # Log the initial Pandas DataFrame
+        # Log initial DataFrame
         logger.info("Initial Pandas DataFrame:")
-        logger.info(f"\n{pandas_df}")
-
-        # Ensure created_indicator is in the correct format
-        pandas_df['created_indicator'] = pd.to_datetime(
-            pandas_df['created_indicator'], errors='coerce'
-        )
-
-        # Drop rows with invalid timestamps
-        pandas_df.dropna(subset=['created_indicator'], inplace=True)
-        if pandas_df.empty:
-            logger.warning("No valid data after filtering invalid timestamps. Skipping batch.")
-            return
-        logger.info(f"---------------predictions started---------------------")
-        predictions = rf_model.predict(pandas_df, forecast_days=730)
-        logger.info(f"---------------predictions cols---------------: {predictions.columns}")
-
+        logger.info(f"\n{pandas_df.columns}")
+        # Preprocess the DataFrame
+        pandas_df = rf_model.preprocess(pandas_df)
+        # Predict
+        logger.info("--------------- Starting predictions ----------------")
+        predictions = rf_model.predict(pandas_df)
+        logger.info(f"Predictions completed. Predictions shape: {predictions.shape}")
+        logger.info(f"Prediction output DataFrame:\n{predictions.columns}")
         # Write predictions to InfluxDB
         for _, record in predictions.iterrows():
             try:
                 point = Point("indicator_predictions") \
-                    .tag("source_country", record.get('source_country', 'unknown')) \
-                    .tag("target_country", record.get('target_country', 'unknown')) \
-                    .field("num_attacks", record.get('num_attacks', 0)) \
+                    .field("num_attacks", record['num_attacks']) \
                     .time(record['created_indicator'])
                 write_with_retry(write_api, point, bucket=FORCAST_BUCKET)
             except Exception as write_error:
@@ -245,8 +234,6 @@ def process_batch(batch_df):
 
     except Exception as e:
         logger.error(f"Error processing batch: {e}")
-
-
 
 ########################-----------------PIPLINES------------------####################################
 def pipeline_top_10_targets_per_country(batch_df):
@@ -620,9 +607,9 @@ def top_10_pulse_tlp(batch_df):
         write_with_retry(write_api, point, bucket=DEFAULT_BUCKET)
 
 def process_all_pipelines(batch_df, batch_id):
-    print(f"§§§§§§§§§§§§§§§§§§§§§§§§§§§§§!! Processing batch ============================= {batch_id}")
-    
-    #batch_df.cache()  # Cache the shared dataset to avoid redundant computation
+    print(f"§§§§§§§§§§§§§§§§§§§§§§§§§§§§§!! Processing batch !!§§§§§§§§§§§§§§§§§§§§§§§§§§§§§ {batch_id}")
+
+    batch_df.cache()  # Cache the shared dataset to avoid redundant computation
     logger.info("==============PREDICTION==============================")
     process_batch(batch_df)
     process_clustering(batch_df)
@@ -646,8 +633,6 @@ def process_all_pipelines(batch_df, batch_id):
     pipeline_top_10_cities(batch_df)
     logger.info("Top 10 authors")
     pipeline_top_10_authors(batch_df)
-    batch_df.unpersist()  # Unpersist after processing
-
 
 query = parsed_stream.writeStream \
     .foreachBatch(process_all_pipelines) \
