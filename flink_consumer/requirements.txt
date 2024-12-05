@@ -1,0 +1,8 @@
+flink
+kafka-python
+pandas
+numpy
+scikit-learn
+statsmodels
+influxdb-client
+apache-flink

@@ -3,8 +3,8 @@ import pandas as pd
 
 # InfluxDB Configuration
 INFLUXDB_HOST = 'http://localhost:8086'  # InfluxDB URL
-AUTH_TOKEN = 'lideTUM3U3sZwpmzk2sDbRayZ7zHKfZzo4U42doc24UZBzPznA1fjU-CeCxEglGuMnvYigYKLNo5S9oyvbjQsA=='  # InfluxDB authentication token
-DEFAULT_BUCKET = 'test'  # InfluxDB bucket to query from
+AUTH_TOKEN = 'JkLVh_Glxl0FfIHnJM3C8HZOVvY_kG_spqDAJ4yK2HlhH7ia6oQqLf5IOy2XpvzMVlThyoFVjiAfsztM_CE8vw==' 
+DEFAULT_BUCKET = 'prediction'  # InfluxDB bucket to query from
 DEFAULT_ORG = 'ransomeware'  # Your InfluxDB organization
 
 # Initialize InfluxDB Client
@@ -13,9 +13,9 @@ influx_client = InfluxDBClient(url=INFLUXDB_HOST, token=AUTH_TOKEN, org=DEFAULT_
 # Query InfluxDB to get the last 2 years of data, and list all available keys (tags and fields)
 def query_available_keys_influxdb():
     query = '''
-    from(bucket: "test")
+    from(bucket: "ransomware")
       |> range(start: -2y)  // Query for the last 2 years of data
-      |> filter(fn: (r) => r._measurement == "indicator_data")  // Filter by the measurement name
+      |> filter(fn: (r) => r._measurement == "top_10_target_countries")  // Filter by the measurement name
       |> keys()  // This returns the keys (tags and fields) of the measurement
     '''
     result = influx_client.query_api().query(query=query)
@@ -37,9 +37,9 @@ def query_available_keys_influxdb():
 # Query InfluxDB to get the last 2 years of data for countryName, if available
 def query_last_2_years_influxdb():
     query = '''
-    from(bucket: "test")
+    from(bucket: "ransomware")
       |> range(start: -2y)  // Query for the last 2 years of data
-      |> filter(fn: (r) => r._measurement == "indicator_data")  // Filter by the measurement name
+      |> filter(fn: (r) => r._measurement == "top_10_target_countries")  // Filter by the measurement name
     '''
     result = influx_client.query_api().query(query=query)
     
