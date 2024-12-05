@@ -10,9 +10,11 @@ app.title = "Ransomware Dashboard"
 
 # Connection details
 url = "http://localhost:8086"  # Replace with your InfluxDB URL
-token = "mTe9pXgfncRUZco9AG3k5tXG1ruePoRhJq-LF2B29yJ6bHTaHMT7l3VkmtUYS9raJbDhTq4kOnTt65YvkAHygA=="  # Replace with your token
+token = 'JkLVh_Glxl0FfIHnJM3C8HZOVvY_kG_spqDAJ4yK2HlhH7ia6oQqLf5IOy2XpvzMVlThyoFVjiAfsztM_CE8vw=='   # Replace with your token
 org = "ransomeware"      # Replace with your organization
-bucket = "ransomware"         # Replace with your bucket
+bucket = 'ransomware'
+PREDICTION_BUCKET = 'prediction'
+
 
 
 try:

@@ -43,6 +43,7 @@ AUTH_TOKEN = 'JkLVh_Glxl0FfIHnJM3C8HZOVvY_kG_spqDAJ4yK2HlhH7ia6oQqLf5IOy2XpvzMVl
 DEFAULT_BUCKET = 'ransomware'
 PREDICTION_BUCKET = 'prediction'
 DEFAULT_ORGANIZATION = 'ransomeware'
+FORCAST_BUCKET = "forcast"
 
 #------------- Initialize Spark Session ---------------------------------#
 spark = SparkSession.builder \
@@ -105,224 +106,8 @@ schema = StructType([
     StructField('target_longitude', DoubleType(), False),
 ])
 
-<<<<<<< HEAD
 # ------------Ensure Bucket Exists Before Starting Stream-----------------""
 def ensure_bucket_exists(bucket_name):
-=======
-# Top 10 Targets per Country Pipeline
-def top_10_targets_per_country(data_stream):
-    result = data_stream.groupBy("target_country", "indicator") \
-        .count() \
-        .withColumnRenamed("count", "attack_count") \
-        .orderBy("target_country", desc("attack_count")) \
-        .limit(10)
-
-    query = result \
-        .writeStream \
-        .outputMode("complete") \
-        .format("console") \
-        .start()
-
-    return query
-
-# Top 10 Threat Sources Pipeline
-def top_10_threat_sources(data_stream):
-    result = data_stream.groupBy("source_country") \
-        .count() \
-        .withColumnRenamed("count", "attack_count") \
-        .orderBy(desc("attack_count")) \
-        .limit(10)
-
-    query = result \
-        .writeStream \
-        .outputMode("complete") \
-        .format("console") \
-        .start()
-
-    return query
-
-def detect_target_country_changes(parsed_stream):
-    # Group by target country and time window, then aggregate
-    aggregated_stream = parsed_stream \
-        .groupBy(
-            "target_country",
-            window(col("created_indicator"), "10 minutes")  # Adjust window duration as needed
-        ) \
-        .agg(count("*").alias("count"))  # Example aggregation: count events
-
-    # Sort the aggregated data
-    sorted_stream = aggregated_stream.orderBy("window", ascending=True)
-
-    # Write stream with 'complete' output mode to support sorting
-    query = sorted_stream.writeStream \
-        .outputMode("complete") \
-        .format("console").start()
-
-    return query
-
-from pyspark.sql.functions import window, count
-
-def detect_source_country_changes(parsed_stream):
-    # Group by source country and time window, then aggregate
-    aggregated_stream = parsed_stream \
-        .groupBy(
-            "source_country",
-            window(col("created_indicator"), "10 minutes")  # Adjust window duration as needed
-        ) \
-        .agg(count("*").alias("attack_count"))  # Example aggregation: count events
-
-    # Sort the aggregated data
-    sorted_stream = aggregated_stream.orderBy("window", ascending=True)
-
-    # Write stream with 'complete' output mode to support sorting
-    query = sorted_stream.writeStream \
-        .outputMode("complete") \
-        .format("console").start()
-
-    return query
-
-# Top 10 Active IPs
-def top_10_active_ips(data_stream):
-    result = data_stream.groupBy("ip") \
-        .count() \
-        .withColumnRenamed("count", "attack_count") \
-        .orderBy(desc("attack_count")) \
-        .limit(10)
-
-    query = result \
-        .writeStream \
-        .outputMode("complete") \
-        .format("console") \
-        .start()
-
-    return query
-
-# Top Attack Type
-def top_attack_type(data_stream):
-    result = data_stream.groupBy("type") \
-        .count() \
-        .withColumnRenamed("count", "attack_count") \
-        .orderBy(desc("attack_count")) \
-        .limit(1)  
-
-    query = result \
-        .writeStream \
-        .outputMode("complete") \
-        .format("console") \
-        .start()
-
-    return query
-
-# Analyzing Attacks by Time
-def attack_trends_by_time(data_stream):
-    result = data_stream.groupBy(window(col("created_indicator"), "1 hour")) \
-        .count() \
-        .withColumnRenamed("count", "attack_count") \
-        .orderBy("window", ascending=True)
-
-    query = result \
-        .writeStream \
-        .outputMode("complete") \
-        .format("console") \
-        .start()
-
-    return query
-
-from pyspark.sql.functions import to_date
-def attacks_by_creation_day(data_stream):
-    result = data_stream.withColumn("created_date", to_date(col("created_indicator"))) \
-        .groupBy("created_date") \
-        .count() \
-        .withColumnRenamed("count", "attack_count") \
-        .orderBy("created_date", ascending=True)
-
-    query = result \
-        .writeStream \
-        .outputMode("complete") \
-        .format("console") \
-        .start()
-
-    return query
-
-from pyspark.sql.functions import month, year
-def attacks_by_creation_month(data_stream):
-    result = data_stream.withColumn("year", year(col("created_indicator"))) \
-        .withColumn("month", month(col("created_indicator"))) \
-        .groupBy("year", "month") \
-        .count() \
-        .withColumnRenamed("count", "attack_count") \
-        .orderBy("year", "month", ascending=True)
-
-    query = result \
-        .writeStream \
-        .outputMode("complete") \
-        .format("console") \
-        .start()
-
-    return query
-
-from pyspark.sql.functions import to_date
-def attacks_by_expiration(data_stream):
-    # Convert the 'indicator_expiration' column to a date format (only date, without time)
-    result = data_stream.withColumn("expiration_date", to_date(col("expiration"))) \
-        .groupBy("expiration_date") \
-        .count() \
-        .withColumnRenamed("count", "attack_count") \
-        .orderBy("expiration_date", ascending=True)
-
-    query = result \
-        .writeStream \
-        .outputMode("complete") \
-        .format("console") \
-        .start()
-
-    return query
-
-'''def train_classification_model(df):
-    logger.info("Training classification models for source country, target country, and malware family...")
-
-    # Ensure 'created_indicator' is correctly converted to Unix timestamp (int64)
-    df['created_indicator_timestamp'] = pd.to_datetime(df['created_indicator'], errors='coerce').astype('int64') / 10**9  # Convert to Unix timestamp in seconds
-
-    # Use the timestamp in the feature set
-    X = df[['source_latitude', 'source_longitude', 'target_latitude', 'target_longitude', 'created_indicator_timestamp']]
-    y_source = df['source_country']
-    y_target = df['target_country']
-    y_malware = df['malware_family']
-    
-    # Train test split
-    X_train, X_test, y_source_train, y_source_test = train_test_split(X, y_source, test_size=0.2, random_state=42)
-    _, _, y_target_train, y_target_test = train_test_split(X, y_target, test_size=0.2, random_state=42)
-    _, _, y_malware_train, y_malware_test = train_test_split(X, y_malware, test_size=0.2, random_state=42)
-    
-    # Random Forest Classifier for source country prediction
-    rf_source = RandomForestClassifier(n_estimators=100, random_state=42)
-    rf_source.fit(X_train, y_source_train)
-    source_predictions = rf_source.predict(X_test)
-    source_accuracy = accuracy_score(y_source_test, source_predictions)
-    logger.info(f"Source country prediction accuracy: {source_accuracy * 100:.2f}%")
-
-    # Random Forest Classifier for target country prediction
-    rf_target = RandomForestClassifier(n_estimators=100, random_state=42)
-    rf_target.fit(X_train, y_target_train)
-    target_predictions = rf_target.predict(X_test)
-    target_accuracy = accuracy_score(y_target_test, target_predictions)
-    logger.info(f"Target country prediction accuracy: {target_accuracy * 100:.2f}%")
-
-    # Random Forest Classifier for malware family prediction
-    rf_malware = RandomForestClassifier(n_estimators=100, random_state=42)
-    rf_malware.fit(X_train, y_malware_train)
-    malware_predictions = rf_malware.predict(X_test)
-    malware_accuracy = accuracy_score(y_malware_test, malware_predictions)
-    logger.info(f"Malware family prediction accuracy: {malware_accuracy * 100:.2f}%")
-
-    return rf_source, rf_target, rf_malware'''
-
-
-# Batch processing with pre-trained models
-def process_batch(batch_df, batch_id):
-    logger.info(f"Processing batch: {batch_id}")
->>>>>>> bf62097d39cb9d096d568e3bfed9ac1f1919ba08
     try:
         buckets = influx_client.buckets_api().find_buckets().buckets
         if not any(bucket.name == bucket_name for bucket in buckets):
@@ -341,7 +126,7 @@ def process_batch(batch_df, batch_id):
 # Ensure both buckets exist
 ensure_bucket_exists(DEFAULT_BUCKET)
 ensure_bucket_exists(PREDICTION_BUCKET)
-
+ensure_bucket_exists(FORCAST_BUCKET)
 
 #----------------Kafka Input Stream--------------------------------#
 kafka_stream = spark.readStream.format("kafka") \
@@ -442,9 +227,9 @@ def process_batch(batch_df):
         if pandas_df.empty:
             logger.warning("No valid data after filtering invalid timestamps. Skipping batch.")
             return
-
+        logger.info(f"---------------predictions started---------------------")
         predictions = rf_model.predict(pandas_df, forecast_days=730)
-        logger.info(f"predictions cols: {predictions.columns}")
+        logger.info(f"---------------predictions cols---------------: {predictions.columns}")
 
         # Write predictions to InfluxDB
         for _, record in predictions.iterrows():
@@ -454,7 +239,7 @@ def process_batch(batch_df):
                     .tag("target_country", record.get('target_country', 'unknown')) \
                     .field("num_attacks", record.get('num_attacks', 0)) \
                     .time(record['created_indicator'])
-                write_with_retry(write_api, point, bucket=PREDICTION_BUCKET)
+                write_with_retry(write_api, point, bucket=FORCAST_BUCKET)
             except Exception as write_error:
                 logger.error(f"Error writing record to InfluxDB: {write_error}")
 
@@ -840,8 +625,8 @@ def process_all_pipelines(batch_df, batch_id):
     #batch_df.cache()  # Cache the shared dataset to avoid redundant computation
     logger.info("==============PREDICTION==============================")
     process_batch(batch_df)
-    #process_clustering(batch_df)
-    """logger.info("Top 10 target countries")
+    process_clustering(batch_df)
+    logger.info("Top 10 target countries")
     pipeline_top_10_targets_per_country(batch_df)
     logger.info("Top 10 threat sources")
     pipeline_top_10_threat_sources(batch_df)
@@ -860,7 +645,7 @@ def process_all_pipelines(batch_df, batch_id):
     logger.info("Top 10 source cities")
     pipeline_top_10_cities(batch_df)
     logger.info("Top 10 authors")
-    pipeline_top_10_authors(batch_df)"""
+    pipeline_top_10_authors(batch_df)
     batch_df.unpersist()  # Unpersist after processing
 
 
@@ -870,32 +655,5 @@ query = parsed_stream.writeStream \
     .trigger(processingTime="10 seconds") \
     .start()
 
-<<<<<<< HEAD
 # Await all streams
 query.awaitTermination()
-=======
-# Start additional monitoring streams
-top_10_targets_query = top_10_targets_per_country(parsed_stream)
-top_10_sources_query = top_10_threat_sources(parsed_stream)
-target_changes_query = detect_target_country_changes(parsed_stream)
-source_changes_query = detect_source_country_changes(parsed_stream)
-top_10_active_ips_query = top_10_active_ips(parsed_stream)
-top_attack_type_query = top_attack_type(parsed_stream)
-trends_by_time_query = attack_trends_by_time(parsed_stream)
-attacks_by_creation_day_query = attacks_by_creation_day(parsed_stream)
-attacks_by_creation_month_query = attacks_by_creation_month(parsed_stream)
-attacks_by_expiration_query = attacks_by_expiration(parsed_stream)
-
-# Await all streams
-query.awaitTermination()
-top_10_targets_query.awaitTermination()
-top_10_sources_query.awaitTermination()
-target_changes_query.awaitTermination()
-source_changes_query.awaitTermination()
-top_10_active_ips_query.awaitTermination()
-top_attack_type_query.awaitTermination()
-trends_by_time_query.awaitTermination()
-attacks_by_creation_day_query.awaitTermination()
-attacks_by_creation_month_query.awaitTermination()
-attacks_by_expiration_query.awaitTermination()
->>>>>>> bf62097d39cb9d096d568e3bfed9ac1f1919ba08
