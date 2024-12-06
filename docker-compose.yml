@@ -178,7 +178,7 @@ services:
       - influxdb
       - kafka  
     volumes:
-      - ./dashboard:/app
+      - ./Dashboard:/app
     environment:
       - KAFKA_BROKER=kafka:9092
       - INFLUXDB_HOST=influxdb:8086
