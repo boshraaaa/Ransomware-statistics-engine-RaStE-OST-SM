@@ -1,6 +1,0 @@
-scikit-learn
-numpy
-matplotlib
-statsmodels
-influxdb-client==1.34.0  # InfluxDB Python client
-pandas==1.5.3 

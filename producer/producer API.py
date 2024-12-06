@@ -4,6 +4,8 @@ import subprocess
 import logging
 from kafka import KafkaProducer
 from OTXv2 import OTXv2, IndicatorTypes
+import random
+
 
 # Logging Configuration
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -89,7 +91,13 @@ def safe_get(data, keys, default="unknown"):
         return data
     except (KeyError, IndexError, TypeError, ValueError):
         return default
-
+    
+country_list = [
+    "United States of America", "India", "China", "France", "Germany", 
+    "Canada", "Brazil", "United Kingdom", "Australia", "Japan", "Russia", 
+    "South Korea", "Mexico", "Italy", "Spain", "Netherlands", "South Africa", 
+    "Sweden", "Argentina", "Saudi Arabia"
+]
 def get_indicator_type_by_name(name):
     for indicator in IndicatorTypes.all_types:
         if indicator.name == name:
@@ -133,10 +141,10 @@ def fetch_facts_for_indicators(indicators, producer):
                     "malware_family": safe_get(fact, ["general", "pulse_info", "related", "other", "malware_families", "0"], r"%23Exploit:NtQueryIntervalProfile"),
                     "ip": safe_get(fact, ["passive_dns", "passive_dns", "0", "address"], "104.37.86.39"),
                     "source_city": safe_get(fact, ["geo", "city"], "Traverse City"),
-                    "source_country": safe_get(fact, ["geo", "country_name"], "United States of America"),
+                    "source_country": safe_get(fact, ["geo", "country_name"],  random.choice(country_list)),
                     "source_latitude": safe_get(fact, ["geo", "latitude"], 44.773289),
                     "source_longitude": safe_get(fact, ["geo", "longitude"], -85.701233),
-                    "target_country": safe_get(fact, ["general", "pulse_info", "targeted_countries", "0"], "Croatia"),
+                    "target_country": safe_get(fact, ["general", "pulse_info", "targeted_countries", "0"],  random.choice(country_list)),
                     "target_latitude": safe_get(fact, ["geo", "latitude"], 45.875832),
                     "target_longitude": safe_get(fact, ["geo", "longitude"], 15.85361),
                 }

@@ -1,24 +1,14 @@
-# Use Python 3.11 slim base image
+# Use a lightweight Python image
 FROM python:3.11-slim
 
-# Set the working directory in the container
+# Set the working directory inside the container
 WORKDIR /app
 
-# Copy the contents of the Dashboard folder into the container
+# Copy all necessary files to the working directory
 COPY . /app
 
-# Install system dependencies for Python and InfluxDB client
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    libffi-dev \
-    libssl-dev && \
-    rm -rf /var/lib/apt/lists/*
-
-# Install Python dependencies
+# Install dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Expose the port Dash will use
-EXPOSE 8050
-
-# Command to run the dashboard application
+# Command to run the app
 CMD ["python", "app.py"]

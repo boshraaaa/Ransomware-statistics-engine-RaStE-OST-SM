@@ -133,7 +133,7 @@ ensure_bucket_exists(FORCAST_BUCKET)
 kafka_stream = spark.readStream.format("kafka") \
     .option("kafka.bootstrap.servers", KAFKA_BROKER) \
     .option("subscribe", KAFKA_TOPIC) \
-    .option("startingOffsets", "earliest") \
+    .option("startingOffsets", "latest") \
     .load()
 
 #----------------------Parse JSON Data from Kafka-----------------------
@@ -638,7 +638,7 @@ def process_all_pipelines(batch_df, batch_id):
 query = parsed_stream.writeStream \
     .foreachBatch(process_all_pipelines) \
     .outputMode("append") \
-    .trigger(processingTime="10 seconds") \
+    .trigger(processingTime="10 minutes") \
     .start()
 
 # Await all streams
