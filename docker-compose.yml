@@ -168,7 +168,7 @@ services:
 
   ransomware-dashboard:
     build:
-      context: ./dashboard
+      context: ./Dashboard
     container_name: ransomware-dashboard
     ports:
       - "8050:8050"
