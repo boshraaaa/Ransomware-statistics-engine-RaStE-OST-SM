@@ -12,7 +12,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     rm -rf /var/lib/apt/lists/*
 
 # Copy the contents of the Main project folder into the container
-COPY . /app
+COPY . /app/
 
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
