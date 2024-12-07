@@ -182,7 +182,7 @@ services:
     environment:
       - KAFKA_BROKER=kafka:9092
       - INFLUXDB_HOST=influxdb:8086
-    command: ["python", "app.py"]  # Command to run the Dash app
+    command: ["python", "/app/app.py"]  # Command to run the Dash app
 
 
 networks:
