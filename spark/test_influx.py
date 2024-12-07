@@ -13,9 +13,9 @@ influx_client = InfluxDBClient(url=INFLUXDB_HOST, token=AUTH_TOKEN, org=DEFAULT_
 # Query InfluxDB to get the last 2 years of data, and list all available keys (tags and fields)
 def query_available_keys_influxdb():
     query = '''
-    from(bucket: "ransomeware")
-      |> range(start: -2y)  // Query for the last 2 years of data
-      |> filter(fn: (r) => r._measurement == "top_10_target_countries")  // Filter by the measurement name
+    from(bucket: "prediction")
+      |> range(start: -8y)  // Query for the last 2 years of data
+      |> filter(fn: (r) => r._measurement == "indicator_predictions")  // Filter by the measurement name
       |> keys()  // This returns the keys (tags and fields) of the measurement
     '''
     result = influx_client.query_api().query(query=query)
@@ -37,13 +37,10 @@ def query_available_keys_influxdb():
 # Query InfluxDB to get the last 2 years of data for countryName, if available
 def query_last_2_years_influxdb():
     query = '''
-    from(bucket: "ransomware")
-        |> range(start: -5y)  // Adjust the time range as needed
-        |> filter(fn: (r) => r._measurement == "top_10_target_countries")
-        |> group(columns: ["target_country"])
-        |> sum(column: "_value")  // Sum the attack counts for each target_country
-        |> sort(columns: ["_value"], desc: true)
-        |> limit(n: 10)
+    from(bucket: "prediction")
+        |> range(start: -8y)  // Adjust the time range as needed
+        |> filter(fn: (r) => r._measurement == "indicator_predictions")
+        |> limit(n: 100)
 
     '''
     result = influx_client.query_api().query(query=query)
