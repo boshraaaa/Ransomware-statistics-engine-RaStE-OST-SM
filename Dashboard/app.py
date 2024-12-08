@@ -44,6 +44,45 @@ def fetch_influxdb_data(query):
 
     return result
 
+def fetch_clustering_data():
+    query = '''
+    from(bucket: "prediction")
+        |> range(start: -1y)
+        |> filter(fn: (r) => r._measurement == "indicator_predictions")
+        |> group(columns: ["indicator", "cluster"])
+        |> sort(columns: ["_time"], desc: true)
+        |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
+    '''
+    data = fetch_influxdb_data(query)
+    
+    # Rename columns if necessary
+    if "_time" in data.columns:
+        data = data.rename(columns={"_time": "Timestamp"})
+        data["Timestamp"] = pd.to_datetime(data["Timestamp"])
+    
+    print("Fetched Clustering Data Preview:")
+    print(data.head())
+    return data
+
+
+def fetch_prediction_data():
+    query = '''
+    from(bucket: "forcast")
+        |> range(start: -1y)
+        |> filter(fn: (r) => r._measurement == "indicator_predictions")
+        |> sort(columns: ["_time"], desc: true)
+        |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
+    '''
+    data = fetch_influxdb_data(query)
+    data = data.rename(columns={
+        "_time": "Timestamp",
+        "num_attacks": "Number of Attacks"
+    })
+    data["Timestamp"] = pd.to_datetime(data["Timestamp"])
+    return data
+
+
+
 def fetch_target_country_changes():
     query = '''
     from(bucket: "ransomware")
@@ -216,6 +255,39 @@ def get_query_data(query_name):
         influx_data = influx_data.rename(columns={"_value": "Attack Count"})
         return influx_data
 
+    elif query_name == "predictions":
+        query = '''
+        from(bucket: "prediction")
+            |> range(start: -8y)  // Adjust the time range as needed
+            |> filter(fn: (r) => r._measurement == "indicator_predictions")
+            |> limit(n: 100)
+        '''
+        influx_data = fetch_influxdb_data(query)
+
+        # Ensure the data is converted to a Pandas DataFrame
+        if isinstance(influx_data, list):
+            influx_data = pd.DataFrame(influx_data)
+
+        # Check if the DataFrame is empty
+        if influx_data.empty:
+            print("No prediction data available.")
+            return pd.DataFrame()
+
+        # Rename columns
+        influx_data = influx_data.rename(columns={
+            "_time": "Timestamp",
+            "num_attacks": "Number of Attacks"
+        })
+
+        # Convert Timestamp to datetime
+        influx_data["Timestamp"] = pd.to_datetime(influx_data["Timestamp"], errors='coerce')
+
+        # Drop rows with invalid timestamps
+        influx_data = influx_data.dropna(subset=["Timestamp"])
+
+        return influx_data
+
+    
     else:
         raise ValueError(f"Unknown query_name: {query_name}")
 
@@ -248,6 +320,8 @@ app.layout = html.Div([
         dcc.Tab(label="Top 10 Active IPs", value="dashboard3"),
         dcc.Tab(label="Attack Trends", value="dashboard4"),
         dcc.Tab(label="Attacks by Date", value="dashboard5"),
+        dcc.Tab(label="Clustering Results", value="dashboard6"),
+        dcc.Tab(label="Prediction Results", value="dashboard7")
     ]),
     html.Div(id="dashboard-content")
 ])
@@ -268,7 +342,60 @@ def render_dashboard(tab_name):
         return render_dashboard_4()
     elif tab_name == "dashboard5":
         return render_dashboard_5()
+    elif tab_name == "dashboard6":
+        return render_dashboard_6()
+    elif tab_name == "dashboard7":
+        return render_dashboard_7()
 
+# Dashboard 6: Clustering Results
+def render_dashboard_6():
+    # Fetch clustering data
+    clustering_data = get_query_data("predictions")
+
+    # Ensure required columns exist
+    #if clustering_data.empty or not {"indicator", "cluster"}.issubset(clustering_data.columns):
+    #return html.Div("No clustering data available.", style={"textAlign": "center", "color": "red"})
+
+    # Create scatter plot
+    fig_scatter = px.scatter(
+        clustering_data,
+        x="source_latitude",
+        y="source_longitude",
+        color="cluster",
+        hover_name="indicator",
+        title="Clustering Results: Indicators by Cluster",
+        labels={"cluster": "Cluster"},
+        color_discrete_sequence=px.colors.qualitative.Set1
+    )
+
+    # Adjust layout
+    fig_scatter.update_layout(
+        xaxis_title="Source Latitude",
+        yaxis_title="Source Longitude",
+        margin={"r": 0, "t": 40, "l": 0, "b": 0},
+        legend_title="Cluster"
+    )
+
+    # Return scatter plot
+    return html.Div([
+        html.H3("Clustering Dashboard: Indicator Clusters", style={"textAlign": "center"}),
+        dcc.Graph(figure=fig_scatter)
+    ])
+    
+# Dashboard 7: Prediction Results
+def render_dashboard_7():
+    prediction_data = fetch_prediction_data()
+    fig_predictions = px.line(
+        prediction_data,
+        x="Timestamp",
+        y="Number of Attacks",
+        title="Prediction Results Over Time",
+        labels={"Number of Attacks": "Predicted Number of Attacks", "Timestamp": "Time"}
+    )
+    return html.Div([
+        html.Div([dcc.Graph(figure=fig_predictions)], style={"width": "100%", "display": "block"}),
+    ])
+    
 def render_dashboard_1():
     # Fetch data for top 10 targets
     top_10_targets = get_query_data("top_10_targets_per_country")

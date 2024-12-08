@@ -5,6 +5,7 @@ import logging
 from kafka import KafkaProducer
 from OTXv2 import OTXv2, IndicatorTypes
 import random
+import os
 
 
 # Logging Configuration
@@ -12,7 +13,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 # Kafka Configuration
-KAFKA_BROKER = 'localhost:9092'
+KAFKA_BROKER = os.getenv('KAFKA_BROKER', 'localhost:9092')  # Default to localhost:9092 if not provided
 KAFKA_INDICATORS_TOPIC = 'indicators_topic'
 PULSE_LIMIT = 10
 
@@ -33,7 +34,7 @@ def load_api_key(config_path):
         return None
 
 # Initialize OTX API Client
-API_KEY = load_api_key(CONFIG_FILE)
+API_KEY = "20c20859433806b76cb39124bfa448603cdb299cca28afa737baa207c91b112e"
 if not API_KEY:
     raise RuntimeError("API key is missing. Please provide a valid key in the config file.")
 
