@@ -14,13 +14,22 @@ services:
   kafka:
     image: wurstmeister/kafka
     container_name: kafka
+    hostname: kafka
     ports:
       - "9092:9092"
     environment:
-      KAFKA_ADVERTISED_HOST_NAME: kafka
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
       KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_CREATE_TOPICS: "indicators_topic:1:1"  # Define topic with format <topic_name>:<partitions>:<replication>
+    depends_on:
+      - zookeeper
+    healthcheck:
+      test: ["CMD", "bash", "-c", "/opt/kafka/bin/kafka-topics.sh --zookeeper zookeeper:2181 --list"]
+      interval: 20s
+      timeout: 10s
+      retries: 5
     networks:
       - ransomware-net
     volumes:
@@ -53,7 +62,8 @@ services:
     environment:
       INFLUXDB_ADMIN_USER: admin
       INFLUXDB_ADMIN_PASSWORD: admin123
-      INFLUXDB_ORG: ransomware
+      INFLUXDB_ORG: ransomeware
+      AUTH_TOKEN: PzlsDdi7nxd96c5ayQyJFMlhKU5My44MUzz-PcnyFdT-oBec76gMz4QnMhGJGpLTcbIw-epIRP1j6AgJakj-6A==
     networks:
       - ransomware-net
     healthcheck:
@@ -136,6 +146,28 @@ services:
     environment:
       INFLUXDB_HOST: influxdb:8086
     command: ["python", "/app/app.py"]
+
+  spark-consumer:
+    build:
+      context: ./spark  # Directory where the Dockerfile resides
+    container_name: spark-consumer
+    depends_on:
+      - kafka
+      - influxdb
+    environment:
+      - KAFKA_BROKER=kafka:9092
+      - INFLUXDB_HOST=http://influxdb:8086
+      - AUTH_TOKEN=PzlsDdi7nxd96c5ayQyJFMlhKU5My44MUzz-PcnyFdT-oBec76gMz4QnMhGJGpLTcbIw-epIRP1j6AgJakj-6A==
+    networks:
+      - ransomware-net
+    volumes:
+      - ./spark:/app  
+      - ./spark/Models/Kmeans/Kmeans_4.pkl:/app/Models/Kmeans/Kmeans_4.pkl
+      - ./spark/Models:/app/Models
+
+# Mount your local code directory into the container
+    command: ["python3", "/app/spark_consumer.py"]
+
 
 networks:
   ransomware-net:

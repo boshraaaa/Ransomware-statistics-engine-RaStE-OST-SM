@@ -7,8 +7,8 @@ import logging
 class Kmeans:
     def __init__(self):
         # Load the pre-trained KMeans model
-        self.kmeans_model = pickle.load(open('C:/Users/I745988/Ransomware-attack/spark/Models/Kmeans/Kmeans_4.pkl', 'rb')) 
-    
+        self.kmeans_model = pickle.load(open('/app/Models/Kmeans/Kmeans_4.pkl', 'rb'))
+
     @staticmethod
     def preprocess_clustering_data(df):
         """Preprocess data for clustering (convert categorical features to integers)."""
