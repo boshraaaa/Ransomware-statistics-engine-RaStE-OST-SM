@@ -7,7 +7,7 @@ services:
     ports:
       - "2181:2181"
     networks:
-      - ransomware-net
+      - ransomware-attack_ransomware-net
     volumes:
       - zookeeper-data:/var/lib/zookeeper
 
@@ -31,7 +31,7 @@ services:
       timeout: 10s
       retries: 5
     networks:
-      - ransomware-net
+      - ransomware-attack_ransomware-net
     volumes:
       - kafka-data:/var/lib/kafka
 
@@ -49,7 +49,7 @@ services:
       interval: 30s
       retries: 3
     networks:
-      - ransomware-net
+      - ransomware-attack_ransomware-net
     command: ["jobmanager"]
 
   influxdb:
@@ -63,9 +63,9 @@ services:
       INFLUXDB_ADMIN_USER: admin
       INFLUXDB_ADMIN_PASSWORD: admin123
       INFLUXDB_ORG: ransomeware
-      AUTH_TOKEN: z3JN5T5FEbxu5C8h87oogTRcCygWai62mA8J8VD7dF1VH-mLj49Wj6isqzxEKftqNwkYAmVBoePjCdZ1C1o4Kg==
+      AUTH_TOKEN: 1j5Ug_kxAwwAoAAblcCWBX9Kmo7nDiKhBEFA7gsctb5td2E86mm4stX9hb9ozOhHEKjckc8H0NZVniXIdZMU0w==
     networks:
-      - ransomware-net
+      - ransomware-attack_ransomware-net
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8086/ping"]
       interval: 30s
@@ -82,7 +82,7 @@ services:
     depends_on:
       - influxdb
     networks:
-      - ransomware-net
+      - ransomware-attack_ransomware-net
     volumes:
       - grafana-data:/var/lib/grafana
 
@@ -99,7 +99,7 @@ services:
     depends_on:
       - kafka
     networks:
-      - ransomware-net
+      - ransomware-attack_ransomware-net
     command: ["python", "producer_API.py"]
 
   spark-master:
@@ -114,7 +114,7 @@ services:
       - "7077:7077"
       - "8080:8080"
     networks:
-      - ransomware-net
+      - ransomware-attack_ransomware-net
     volumes:
       - spark-master-data:/opt/bitnami/spark/data
 
@@ -127,7 +127,7 @@ services:
     depends_on:
       - spark-master
     networks:
-      - ransomware-net
+      - ransomware-attack_ransomware-net
     volumes:
       - spark-worker-data:/opt/bitnami/spark/data
 
@@ -138,13 +138,14 @@ services:
     ports:
       - "8050:8050"
     networks:
-      - ransomware-net
+      - ransomware-attack_ransomware-net
     depends_on:
       - influxdb
     volumes:
       - ./Dashboard:/app
     environment:
-      INFLUXDB_HOST: influxdb:8086
+      INFLUXDB_HOST: http://influxdb:8086
+      INFLUXDB_TOKEN: 1j5Ug_kxAwwAoAAblcCWBX9Kmo7nDiKhBEFA7gsctb5td2E86mm4stX9hb9ozOhHEKjckc8H0NZVniXIdZMU0w==
     command: ["python", "/app/app.py"]
 
   spark-consumer:
@@ -157,9 +158,9 @@ services:
     environment:
       - KAFKA_BROKER=kafka:9092
       - INFLUXDB_HOST=http://influxdb:8086
-      - AUTH_TOKEN=z3JN5T5FEbxu5C8h87oogTRcCygWai62mA8J8VD7dF1VH-mLj49Wj6isqzxEKftqNwkYAmVBoePjCdZ1C1o4Kg==
+      - AUTH_TOKEN=1j5Ug_kxAwwAoAAblcCWBX9Kmo7nDiKhBEFA7gsctb5td2E86mm4stX9hb9ozOhHEKjckc8H0NZVniXIdZMU0w==
     networks:
-      - ransomware-net
+      - ransomware-attack_ransomware-net
     volumes:
       - ./spark:/app  
       - ./spark/Models/Kmeans/Kmeans_4.pkl:/app/Models/Kmeans/Kmeans_4.pkl
@@ -170,7 +171,7 @@ services:
 
 
 networks:
-  ransomware-net:
+  ransomware-attack_ransomware-net:
     driver: bridge
 
 volumes:
