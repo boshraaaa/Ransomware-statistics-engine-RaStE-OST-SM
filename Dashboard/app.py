@@ -2,15 +2,15 @@ from dash import Dash, dcc, html, Input, Output
 import plotly.express as px
 import pandas as pd
 from influxdb_client import InfluxDBClient
-
+import os
 # Create Dash App
 app = Dash(__name__)
 app.title = "Ransomware Dashboard"
 
 
 # Connection details
-url = "http://localhost:8086"  # Replace with your InfluxDB URL
-token = 'JkLVh_Glxl0FfIHnJM3C8HZOVvY_kG_spqDAJ4yK2HlhH7ia6oQqLf5IOy2XpvzMVlThyoFVjiAfsztM_CE8vw=='   # Replace with your token
+url = os.getenv("INFLUXDB_HOST", "http://localhost:8086")
+token = '1j5Ug_kxAwwAoAAblcCWBX9Kmo7nDiKhBEFA7gsctb5td2E86mm4stX9hb9ozOhHEKjckc8H0NZVniXIdZMU0w=='  # Replace with your token
 org = "ransomeware"      # Replace with your organization
 bucket = 'ransomware'
 PREDICTION_BUCKET = 'prediction'

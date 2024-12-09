@@ -63,7 +63,7 @@ services:
       INFLUXDB_ADMIN_USER: admin
       INFLUXDB_ADMIN_PASSWORD: admin123
       INFLUXDB_ORG: ransomeware
-      AUTH_TOKEN: PzlsDdi7nxd96c5ayQyJFMlhKU5My44MUzz-PcnyFdT-oBec76gMz4QnMhGJGpLTcbIw-epIRP1j6AgJakj-6A==
+      AUTH_TOKEN: z3JN5T5FEbxu5C8h87oogTRcCygWai62mA8J8VD7dF1VH-mLj49Wj6isqzxEKftqNwkYAmVBoePjCdZ1C1o4Kg==
     networks:
       - ransomware-net
     healthcheck:
@@ -157,7 +157,7 @@ services:
     environment:
       - KAFKA_BROKER=kafka:9092
       - INFLUXDB_HOST=http://influxdb:8086
-      - AUTH_TOKEN=PzlsDdi7nxd96c5ayQyJFMlhKU5My44MUzz-PcnyFdT-oBec76gMz4QnMhGJGpLTcbIw-epIRP1j6AgJakj-6A==
+      - AUTH_TOKEN=z3JN5T5FEbxu5C8h87oogTRcCygWai62mA8J8VD7dF1VH-mLj49Wj6isqzxEKftqNwkYAmVBoePjCdZ1C1o4Kg==
     networks:
       - ransomware-net
     volumes:

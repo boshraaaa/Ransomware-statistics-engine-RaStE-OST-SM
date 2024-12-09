@@ -42,7 +42,7 @@ KAFKA_TOPIC = 'indicators_topic'
 
 # InfluxDB Configuration
 INFLUXDB_HOST = 'http://influxdb:8086'
-AUTH_TOKEN = 'PzlsDdi7nxd96c5ayQyJFMlhKU5My44MUzz-PcnyFdT-oBec76gMz4QnMhGJGpLTcbIw-epIRP1j6AgJakj-6A=='
+AUTH_TOKEN = '1j5Ug_kxAwwAoAAblcCWBX9Kmo7nDiKhBEFA7gsctb5td2E86mm4stX9hb9ozOhHEKjckc8H0NZVniXIdZMU0w=='
 DEFAULT_ORGANIZATION = 'ransomeware'
 # Buckets
 DEFAULT_BUCKET = 'ransomware' # for the 10 pipelines
@@ -50,7 +50,7 @@ PREDICTION_BUCKET = 'prediction' # for clustering
 FORCAST_BUCKET = "forcast" # for forcast
 
 KAFKA_BROKER = os.getenv('KAFKA_BROKER', 'http://localhost:9092')
-INFLUXDB_HOST = os.getenv('INFLUXDB_HOST', 'http://localhost:8086')
+INFLUXDB_HOST = os.getenv('INFLUXDB_HOST', 'http://influxdb:8086')
 
 import os
 if not os.path.exists("/app/Models/Forcast/Forcastrandom_forest_model.pkl"):
@@ -144,7 +144,7 @@ ensure_bucket_exists(FORCAST_BUCKET)
 kafka_stream = spark.readStream.format("kafka") \
     .option("kafka.bootstrap.servers", KAFKA_BROKER) \
     .option("subscribe", KAFKA_TOPIC) \
-    .option("startingOffsets", "earliest") \
+    .option("startingOffsets", "latest") \
     .load()
 
 #----------------------Parse JSON Data from Kafka-----------------------
